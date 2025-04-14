@@ -258,7 +258,6 @@ class _GameGridScreenState extends State<GameGridScreen> {
         return false;
       },
       onAccept: (dragData) {
-        // Merge: Increment the target tile's overlay number; clear the source.
         setState(() {
           int mergedValue = tileData.overlayNumber + 1;
           gridData[row][col] = TileData(
@@ -288,19 +287,28 @@ class _GameGridScreenState extends State<GameGridScreen> {
               borderRadius: BorderRadius.circular(4.0),
             ),
             child: Center(
-              child: Text(
-                '${tileData.overlayNumber}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Colors.white,
-                  shadows: [
-                    Shadow(
-                      blurRadius: 2.0,
-                      color: Colors.black54,
-                      offset: Offset(1, 1),
-                    ),
-                  ],
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder:
+                    (child, animation) =>
+                        ScaleTransition(scale: animation, child: child),
+                child: Text(
+                  '${tileData.overlayNumber}',
+                  key: ValueKey<int>(
+                    tileData.overlayNumber,
+                  ), // Key to trigger the change
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        blurRadius: 2.0,
+                        color: Colors.black54,
+                        offset: Offset(1, 1),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
