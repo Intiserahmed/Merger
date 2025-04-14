@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:merger/how_to.dart';
 import 'package:merger/tileData.dart';
 
 void main() {
@@ -16,7 +17,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const GameGridScreen(),
+      home: const HowToProgressOverlay(),
     );
   }
 }
