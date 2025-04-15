@@ -1,41 +1,26 @@
 // lib/models/player_stats.dart
-import 'package:flutter/foundation.dart';
+import 'package:isar/isar.dart';
 
-@immutable
+part 'player_stats.g.dart'; // Isar generated code
+
+@collection
 class PlayerStats {
-  final int level;
-  final int xp;
-  final int coins;
-  final int energy;
+  Id id =
+      Isar.autoIncrement; // Use autoIncrement for a single player stats object
+
+  int level;
+  int xp;
+  int coins;
+  int energy;
   // Add maxEnergy etc. as needed
 
-  const PlayerStats({
+  // Constructor with default values
+  PlayerStats({
     this.level = 1,
     this.xp = 0,
     this.coins = 50, // Starting values
     this.energy = 100,
   });
 
-  PlayerStats copyWith({int? level, int? xp, int? coins, int? energy}) {
-    return PlayerStats(
-      level: level ?? this.level,
-      xp: xp ?? this.xp,
-      coins: coins ?? this.coins,
-      energy: energy ?? this.energy,
-    );
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PlayerStats &&
-          runtimeType == other.runtimeType &&
-          level == other.level &&
-          xp == other.xp &&
-          coins == other.coins &&
-          energy == other.energy;
-
-  @override
-  int get hashCode =>
-      level.hashCode ^ xp.hashCode ^ coins.hashCode ^ energy.hashCode;
+  // Note: Removed copyWith, ==, and hashCode
 }

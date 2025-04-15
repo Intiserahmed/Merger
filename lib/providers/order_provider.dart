@@ -25,32 +25,45 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     ];
   }
 
-  void fulfillOrder(String orderId, String itemId) {
-    // Logic to find the order, update its currentCount
-    // If order complete, remove it and generate a new one, grant rewards
-    state =
-        state
-            .map((order) {
-              if (order.id == orderId &&
-                  order.requiredItemId == itemId &&
-                  order.currentCount < order.requiredCount) {
-                final newCount = order.currentCount + 1;
-                if (newCount == order.requiredCount) {
-                  // Order Complete! - Handled by maybe removing/replacing
-                  print("Order ${order.id} complete!");
-                  // Grant rewards (handled via player provider later)
-                  return null; // Mark for removal
-                } else {
-                  return order.copyWith(currentCount: newCount);
-                }
-              }
-              return order;
-            })
-            .whereType<Order>()
-            .toList(); // Filter out nulls (completed orders)
+  void fulfillOrder(String orderId, String itemId /*, WidgetRef ref */) {
+    final List<Order> updatedOrders = [];
+    bool orderCompleted = false;
+    Order? completedOrderData;
 
-    // Maybe add a new order if list is short
-    _maybeAddNewOrder();
+    for (var order in state) {
+      if (order.id == orderId &&
+          order.requiredItemId == itemId &&
+          order.currentCount < order.requiredCount) {
+        // Directly modify the mutable order object
+        order.currentCount++;
+        if (order.currentCount == order.requiredCount) {
+          // Order Complete!
+          print("Order ${order.id} complete!");
+          orderCompleted = true;
+          completedOrderData = order;
+          // Don't add the completed order back to the list
+        } else {
+          // Order updated but not complete, add the modified order
+          updatedOrders.add(order);
+        }
+      } else {
+        // Keep other orders as they are
+        updatedOrders.add(order);
+      }
+    }
+
+    // Update the state with the new list
+    state = updatedOrders;
+
+    if (orderCompleted && completedOrderData != null) {
+      // Optional: Immediately grant rewards here or call completeOrder
+      // final playerNotifier = ref.read(playerStatsProvider.notifier);
+      // playerNotifier.addCoins(completedOrderData.rewardCoins);
+      // playerNotifier.addXp(completedOrderData.rewardXp);
+
+      // Or just rely on completeOrder being called elsewhere if needed
+      _maybeAddNewOrder(); // Add a new order to replace the completed one
+    }
   }
 
   void _maybeAddNewOrder() {

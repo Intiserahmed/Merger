@@ -230,10 +230,13 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     if (tile.overlayNumber > 0) {
       final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
       final newNumber = tile.overlayNumber - 1;
-      newGrid[row][col] = tile.copyWith(
+      // Create a new TileData instance with updated values
+      newGrid[row][col] = TileData(
+        baseImagePath: tile.baseImagePath, // Keep existing base image
+        itemImagePath: tile.itemImagePath, // Keep existing item image
         overlayNumber: newNumber,
         // If number reaches 0, potentially reveal an item or just empty tile
-        // itemImagePath: newNumber == 0 ? getRevealedItem(...) : tile.itemImagePath,
+        // itemImagePath: newNumber == 0 ? getRevealedItem(...) : null, // Example: clear item if number is 0
       );
       state = newGrid;
     }
