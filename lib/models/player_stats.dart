@@ -12,7 +12,7 @@ class PlayerStats {
   int xp;
   int coins;
   int energy;
-  // Add maxEnergy etc. as needed
+  int maxEnergy; // Maximum energy capacity
 
   // Constructor with default values
   PlayerStats({
@@ -20,6 +20,7 @@ class PlayerStats {
     this.xp = 0,
     this.coins = 50, // Starting values
     this.energy = 100,
+    this.maxEnergy = 100, // Default max energy
   });
 
   // Note: Removed copyWith, ==, and hashCode

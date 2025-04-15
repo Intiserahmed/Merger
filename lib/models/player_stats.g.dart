@@ -32,8 +32,13 @@ const PlayerStatsSchema = CollectionSchema(
       name: r'level',
       type: IsarType.long,
     ),
-    r'xp': PropertySchema(
+    r'maxEnergy': PropertySchema(
       id: 3,
+      name: r'maxEnergy',
+      type: IsarType.long,
+    ),
+    r'xp': PropertySchema(
+      id: 4,
       name: r'xp',
       type: IsarType.long,
     )
@@ -70,7 +75,8 @@ void _playerStatsSerialize(
   writer.writeLong(offsets[0], object.coins);
   writer.writeLong(offsets[1], object.energy);
   writer.writeLong(offsets[2], object.level);
-  writer.writeLong(offsets[3], object.xp);
+  writer.writeLong(offsets[3], object.maxEnergy);
+  writer.writeLong(offsets[4], object.xp);
 }
 
 PlayerStats _playerStatsDeserialize(
@@ -83,7 +89,8 @@ PlayerStats _playerStatsDeserialize(
     coins: reader.readLongOrNull(offsets[0]) ?? 50,
     energy: reader.readLongOrNull(offsets[1]) ?? 100,
     level: reader.readLongOrNull(offsets[2]) ?? 1,
-    xp: reader.readLongOrNull(offsets[3]) ?? 0,
+    maxEnergy: reader.readLongOrNull(offsets[3]) ?? 100,
+    xp: reader.readLongOrNull(offsets[4]) ?? 0,
   );
   object.id = id;
   return object;
@@ -103,6 +110,8 @@ P _playerStatsDeserializeProp<P>(
     case 2:
       return (reader.readLongOrNull(offset) ?? 1) as P;
     case 3:
+      return (reader.readLongOrNull(offset) ?? 100) as P;
+    case 4:
       return (reader.readLongOrNull(offset) ?? 0) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -417,6 +426,62 @@ extension PlayerStatsQueryFilter
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      maxEnergyEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'maxEnergy',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      maxEnergyGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'maxEnergy',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      maxEnergyLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'maxEnergy',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      maxEnergyBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'maxEnergy',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition> xpEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -515,6 +580,18 @@ extension PlayerStatsQuerySortBy
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByMaxEnergy() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'maxEnergy', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByMaxEnergyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'maxEnergy', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByXp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'xp', Sort.asc);
@@ -578,6 +655,18 @@ extension PlayerStatsQuerySortThenBy
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByMaxEnergy() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'maxEnergy', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByMaxEnergyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'maxEnergy', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByXp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'xp', Sort.asc);
@@ -611,6 +700,12 @@ extension PlayerStatsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QDistinct> distinctByMaxEnergy() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'maxEnergy');
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QDistinct> distinctByXp() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'xp');
@@ -641,6 +736,12 @@ extension PlayerStatsQueryProperty
   QueryBuilder<PlayerStats, int, QQueryOperations> levelProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'level');
+    });
+  }
+
+  QueryBuilder<PlayerStats, int, QQueryOperations> maxEnergyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'maxEnergy');
     });
   }
 

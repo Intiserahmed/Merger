@@ -1,18 +1,33 @@
 // lib/providers/grid_provider.dart
 import 'dart:math'; // For finding random empty tile later if needed
+import 'dart:async'; // For Future/delay if needed for cooldown visuals
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart'; // For deep map equality if needed
 import '../models/tile_data.dart';
+import 'player_provider.dart'; // Import player provider for energy checks
+
+// --- Generator Definitions ---
+const String barracksEmoji = '🏕️';
+const String mineEmoji = '⛏️';
+const String swordEmoji = '⚔️';
+const String coinEmoji = '💰';
+
+const int barracksCooldown = 15; // seconds
+const int mineCooldown = 30; // seconds
+const int barracksEnergyCost = 5;
+const int mineEnergyCost = 2;
 
 const int rowCount = 11;
 const int colCount = 6;
 
 class GridNotifier extends StateNotifier<List<List<TileData>>> {
-  // Initialize the grid in the constructor by calling a helper
-  GridNotifier() : super(_initializeGridData());
+  final Ref ref; // Add ref to access other providers
 
-  // --- Initialization Logic (using Emojis) ---
+  // Initialize the grid in the constructor by calling a helper
+  GridNotifier(this.ref) : super(_initializeGridData());
+
+  // --- Initialization Logic (using Emojis & TileType) ---
   static List<List<TileData>> _initializeGridData() {
     // Define Emojis (Makes it easy to change later)
     const String sand = '🟫'; // Brown Square for Sand
@@ -27,104 +42,183 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
     return List.generate(rowCount, (row) {
       return List.generate(colCount, (col) {
-        // --- Map layout using Emojis ---
-        // Overlay numbers still take precedence visually, but define base emoji
+        // --- Map layout using Emojis & TileType ---
+        // Most tiles are items or empty. Generators will be placed later.
         if (row == 0 && col == 4)
-          return TileData(baseImagePath: sand, overlayNumber: 11);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 11,
+          );
         if (row == 0 && col == 5)
-          return TileData(baseImagePath: sand, overlayNumber: 11);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 11,
+          );
         if (row == 1 && col == 3)
-          return TileData(baseImagePath: grass); // Grass tile
+          return TileData(
+            type: TileType.empty,
+            baseImagePath: grass,
+          ); // Grass tile
         if (row == 1 && col == 4)
-          return TileData(baseImagePath: sand, overlayNumber: 10);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 10,
+          );
         if (row == 1 && col == 5)
-          return TileData(baseImagePath: sand, overlayNumber: 10);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 10,
+          );
         if (row == 1 && col == 2)
-          return TileData(baseImagePath: sand, overlayNumber: 9);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 9,
+          );
 
         if (row == 2 && col == 0)
-          return TileData(baseImagePath: sand, overlayNumber: 8);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 8,
+          );
         if (row == 2 && col == 1)
-          return TileData(baseImagePath: sand, overlayNumber: 8);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 8,
+          );
         if (row == 2 && col == 3)
-          return TileData(baseImagePath: grass); // Grass tile
+          return TileData(
+            type: TileType.empty,
+            baseImagePath: grass,
+          ); // Grass tile
 
         if (row == 3 && col == 0)
-          return TileData(baseImagePath: sand, overlayNumber: 8);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 8,
+          );
         if (row == 3 && col == 1)
-          return TileData(baseImagePath: sand, overlayNumber: 7);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 7,
+          );
         if (row == 3 && col == 2)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: photo,
           ); // Photo item
         if (row == 3 && col == 5)
-          return TileData(baseImagePath: sand, overlayNumber: 6);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 6,
+          );
         if (row == 3 && col == 4)
-          return TileData(baseImagePath: sand, overlayNumber: 6);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 6,
+          );
 
         if (row == 4 && col == 0)
-          return TileData(baseImagePath: sand, overlayNumber: 8);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 8,
+          );
         if (row == 4 && col == 1)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
         if (row == 4 && col == 2)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: sword,
           ); // Sword item
         if (row == 4 && col == 3)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: star,
           ); // Star item
         if (row == 4 && col == 4)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
         if (row == 4 && col == 5)
-          return TileData(baseImagePath: sand, overlayNumber: 6);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 6,
+          );
 
         if (row == 5 && col == 0)
-          return TileData(baseImagePath: sand, overlayNumber: 8);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 8,
+          );
         if (row == 5 && col == 1)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: shell,
           ); // Shell item
         if (row == 5 && col == 2)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: shell,
           ); // Shell item
 
         if (row == 6 && col == 0)
-          return TileData(baseImagePath: sand, overlayNumber: 8);
+          return TileData(
+            type: TileType.item,
+            baseImagePath: sand,
+            overlayNumber: 8,
+          );
         if (row == 6 && col == 1)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
         if (row == 6 && col == 2)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
 
         if (row == 7 && col == 0)
           return TileData(
+            type: TileType.item,
             baseImagePath: sand,
             itemImagePath: photo,
           ); // Photo item
 
         if (row < 2 && col < 4)
-          return TileData(baseImagePath: grass); // Top left grassy area
+          return TileData(
+            type: TileType.empty,
+            baseImagePath: grass,
+          ); // Top left grassy area
 
-        // Default: Plain sand tile
-        return TileData(baseImagePath: defaultEmpty);
+        // Default: Plain empty tile
+        return TileData(type: TileType.empty, baseImagePath: defaultEmpty);
       });
     });
   }
@@ -209,7 +303,7 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     // Add more item merge rules with 'else if' blocks as needed
   }
 
-  /// Example method: Updates a single tile (useful for spawning items etc.)
+  /// Updates a single tile's data. Use this for placing items, generators, etc.
   void updateTile(int row, int col, TileData newTileData) {
     if (row < 0 || row >= rowCount || col < 0 || col >= colCount)
       return; // Bounds check
@@ -242,17 +336,16 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     }
   }
 
-  /// Finds the first empty tile and places the specified item there.
+  /// Finds the first empty tile (type == TileType.empty) and places the specified item there.
   /// Returns true if successful, false if no empty tile is found.
-  bool spawnItem(String itemEmoji) {
+  bool spawnItemOnFirstEmpty(String itemEmoji) {
     final currentGrid = state;
     int? emptyRow, emptyCol;
 
-    // Find the first empty tile (no overlay number, no item)
+    // Find the first empty tile
     for (int r = 0; r < rowCount; r++) {
       for (int c = 0; c < colCount; c++) {
-        if (currentGrid[r][c].overlayNumber == 0 &&
-            currentGrid[r][c].itemImagePath == null) {
+        if (currentGrid[r][c].type == TileType.empty) {
           emptyRow = r;
           emptyCol = c;
           break; // Found the first one
@@ -265,18 +358,148 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       // Create new tile data with the item
       final currentTile = currentGrid[emptyRow][emptyCol];
       final newTileData = TileData(
+        type: TileType.item, // It's now an item tile
         baseImagePath: currentTile.baseImagePath, // Keep the base
         itemImagePath: itemEmoji,
+        overlayNumber: 0, // Default for spawned base items
       );
 
-      // Update the grid state
-      final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
-      newGrid[emptyRow][emptyCol] = newTileData;
-      state = newGrid;
+      // Update the grid state using the existing method
+      updateTile(emptyRow, emptyCol, newTileData);
       return true; // Item spawned successfully
     } else {
       print("No empty tile found to spawn item.");
       return false; // No empty tile found
+    }
+  }
+
+  /// Places a specific generator type at the given coordinates.
+  /// Overwrites whatever is currently there. (For testing/debug)
+  void placeGenerator(int row, int col, String generatorEmoji) {
+    if (row < 0 || row >= rowCount || col < 0 || col >= colCount) return;
+
+    TileData generatorData;
+    if (generatorEmoji == barracksEmoji) {
+      generatorData = TileData(
+        type: TileType.generator,
+        baseImagePath: generatorEmoji, // Use emoji as base image
+        generatesItemPath: swordEmoji,
+        cooldownSeconds: barracksCooldown,
+        energyCost: barracksEnergyCost,
+      );
+    } else if (generatorEmoji == mineEmoji) {
+      generatorData = TileData(
+        type: TileType.generator,
+        baseImagePath: generatorEmoji,
+        generatesItemPath: coinEmoji,
+        cooldownSeconds: mineCooldown,
+        energyCost: mineEnergyCost,
+      );
+    } else {
+      print("Unknown generator type: $generatorEmoji");
+      return; // Don't place anything if unknown
+    }
+
+    updateTile(row, col, generatorData);
+  }
+
+  // --- Generator Activation Logic ---
+  /// Attempts to activate a generator at the given coordinates.
+  void activateGenerator(int row, int col) {
+    if (row < 0 || row >= rowCount || col < 0 || col >= colCount) return;
+
+    final currentGrid = state;
+    final TileData generatorTile = currentGrid[row][col];
+
+    // 1. Check if it's actually a ready generator
+    if (!generatorTile.isGenerator) {
+      print("Tile at ($row, $col) is not a generator.");
+      return;
+    }
+    if (!generatorTile.isReady) {
+      print("Generator at ($row, $col) is on cooldown.");
+      // Optional: Show feedback to user (e.g., SnackBar)
+      return;
+    }
+    if (generatorTile.generatesItemPath == null) {
+      print("Generator at ($row, $col) has nothing defined to generate.");
+      return;
+    }
+
+    // 2. Check Energy Cost
+    final playerNotifier = ref.read(playerStatsProvider.notifier);
+    if (!playerNotifier.spendEnergy(generatorTile.energyCost)) {
+      print("Not enough energy to activate generator at ($row, $col).");
+      // Optional: Show feedback to user
+      return;
+    }
+
+    // 3. Find Adjacent Empty Tile
+    int? targetRow, targetCol;
+    final List<Point<int>> neighbors = [
+      Point(row - 1, col), Point(row + 1, col),
+      Point(row, col - 1), Point(row, col + 1),
+      // Optional: Add diagonals if desired
+      // Point(row - 1, col - 1), Point(row - 1, col + 1),
+      // Point(row + 1, col - 1), Point(row + 1, col + 1),
+    ];
+
+    for (final neighbor in neighbors) {
+      final r = neighbor.x;
+      final c = neighbor.y;
+      // Check bounds and if the tile is empty
+      if (r >= 0 &&
+          r < rowCount &&
+          c >= 0 &&
+          c < colCount &&
+          currentGrid[r][c].type == TileType.empty) {
+        targetRow = r;
+        targetCol = c;
+        break; // Found the first empty neighbor
+      }
+    }
+
+    // 4. Spawn Item if Empty Neighbor Found
+    if (targetRow != null && targetCol != null) {
+      // Create the spawned item tile data
+      final spawnedItemData = TileData(
+        type: TileType.item,
+        baseImagePath:
+            currentGrid[targetRow][targetCol].baseImagePath, // Keep base
+        itemImagePath: generatorTile.generatesItemPath!,
+        overlayNumber: 0, // Base items usually start at 0 or 1
+      );
+
+      // Create updated generator tile data (with new timestamp)
+      final updatedGeneratorData = TileData(
+        type: generatorTile.type,
+        baseImagePath: generatorTile.baseImagePath,
+        itemImagePath: generatorTile.itemImagePath,
+        overlayNumber: generatorTile.overlayNumber,
+        generatesItemPath: generatorTile.generatesItemPath,
+        cooldownSeconds: generatorTile.cooldownSeconds,
+        lastUsedTimestamp: DateTime.now(), // Set activation time
+        energyCost: generatorTile.energyCost,
+      );
+
+      // Update the grid state
+      final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
+      newGrid[targetRow][targetCol] = spawnedItemData; // Place the item
+      newGrid[row][col] =
+          updatedGeneratorData; // Update the generator timestamp
+      state = newGrid;
+
+      print(
+        "Generator at ($row, $col) activated, spawned ${generatorTile.generatesItemPath} at ($targetRow, $targetCol).",
+      );
+    } else {
+      print("No empty adjacent tile found for generator at ($row, $col).");
+      // Refund energy since item couldn't be placed
+      playerNotifier.addEnergy(
+        generatorTile.energyCost,
+      ); // Call the correct addEnergy method
+      print("Energy refunded.");
+      // Optional: Show feedback to user
     }
   }
 
@@ -287,5 +510,5 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 final gridProvider = StateNotifierProvider<GridNotifier, List<List<TileData>>>((
   ref,
 ) {
-  return GridNotifier();
+  return GridNotifier(ref); // Pass the ref to the constructor
 });

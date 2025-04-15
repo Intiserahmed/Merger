@@ -194,7 +194,15 @@ class GameGridScreen extends ConsumerWidget {
             child: content,
           );
         } else {
-          return content; // Not draggable
+          return GestureDetector(
+            onTap: () {
+              // Call activateGenerator if it's a generator
+              if (tileData.isGenerator) {
+                ref.read(gridProvider.notifier).activateGenerator(row, col);
+              }
+            },
+            child: content, // Wrap content in GestureDetector
+          ); // Not draggable
         }
       },
     );
@@ -215,6 +223,24 @@ class GameGridScreen extends ConsumerWidget {
                 padding: const EdgeInsets.only(right: 16.0),
                 child: Center(child: Text('💰: $coins')), // Use coin emoji
               );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.build), // Or any other icon
+            tooltip: 'Place Barracks (Debug)',
+            onPressed: () {
+              ref
+                  .read(gridProvider.notifier)
+                  .placeGenerator(1, 1, barracksEmoji); // Example: Place at 1,1
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.agriculture), // Or any other icon
+            tooltip: 'Place Mine (Debug)',
+            onPressed: () {
+              ref
+                  .read(gridProvider.notifier)
+                  .placeGenerator(2, 2, mineEmoji); // Example: Place at 2,2
             },
           ),
         ],
@@ -243,7 +269,7 @@ class GameGridScreen extends ConsumerWidget {
 
           if (energySpent) {
             // 2. If energy spent, try to spawn an item (e.g., Shell)
-            final bool itemSpawned = gridNotifier.spawnItem(
+            final bool itemSpawned = gridNotifier.spawnItemOnFirstEmpty(
               '🐚',
             ); // Spawn a shell
 

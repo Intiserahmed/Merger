@@ -22,15 +22,61 @@ const TileDataSchema = CollectionSchema(
       name: r'baseImagePath',
       type: IsarType.string,
     ),
-    r'itemImagePath': PropertySchema(
+    r'cooldownSeconds': PropertySchema(
       id: 1,
+      name: r'cooldownSeconds',
+      type: IsarType.long,
+    ),
+    r'energyCost': PropertySchema(
+      id: 2,
+      name: r'energyCost',
+      type: IsarType.long,
+    ),
+    r'generatesItemPath': PropertySchema(
+      id: 3,
+      name: r'generatesItemPath',
+      type: IsarType.string,
+    ),
+    r'isEmpty': PropertySchema(
+      id: 4,
+      name: r'isEmpty',
+      type: IsarType.bool,
+    ),
+    r'isGenerator': PropertySchema(
+      id: 5,
+      name: r'isGenerator',
+      type: IsarType.bool,
+    ),
+    r'isItem': PropertySchema(
+      id: 6,
+      name: r'isItem',
+      type: IsarType.bool,
+    ),
+    r'isLocked': PropertySchema(
+      id: 7,
+      name: r'isLocked',
+      type: IsarType.bool,
+    ),
+    r'itemImagePath': PropertySchema(
+      id: 8,
       name: r'itemImagePath',
       type: IsarType.string,
     ),
+    r'lastUsedTimestamp': PropertySchema(
+      id: 9,
+      name: r'lastUsedTimestamp',
+      type: IsarType.dateTime,
+    ),
     r'overlayNumber': PropertySchema(
-      id: 2,
+      id: 10,
       name: r'overlayNumber',
       type: IsarType.long,
+    ),
+    r'type': PropertySchema(
+      id: 11,
+      name: r'type',
+      type: IsarType.byte,
+      enumMap: _TileDatatypeEnumValueMap,
     )
   },
   estimateSize: _tileDataEstimateSize,
@@ -55,6 +101,12 @@ int _tileDataEstimateSize(
   var bytesCount = offsets.last;
   bytesCount += 3 + object.baseImagePath.length * 3;
   {
+    final value = object.generatesItemPath;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.itemImagePath;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -70,8 +122,17 @@ void _tileDataSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.baseImagePath);
-  writer.writeString(offsets[1], object.itemImagePath);
-  writer.writeLong(offsets[2], object.overlayNumber);
+  writer.writeLong(offsets[1], object.cooldownSeconds);
+  writer.writeLong(offsets[2], object.energyCost);
+  writer.writeString(offsets[3], object.generatesItemPath);
+  writer.writeBool(offsets[4], object.isEmpty);
+  writer.writeBool(offsets[5], object.isGenerator);
+  writer.writeBool(offsets[6], object.isItem);
+  writer.writeBool(offsets[7], object.isLocked);
+  writer.writeString(offsets[8], object.itemImagePath);
+  writer.writeDateTime(offsets[9], object.lastUsedTimestamp);
+  writer.writeLong(offsets[10], object.overlayNumber);
+  writer.writeByte(offsets[11], object.type.index);
 }
 
 TileData _tileDataDeserialize(
@@ -82,10 +143,16 @@ TileData _tileDataDeserialize(
 ) {
   final object = TileData(
     baseImagePath: reader.readString(offsets[0]),
-    itemImagePath: reader.readStringOrNull(offsets[1]),
-    overlayNumber: reader.readLongOrNull(offsets[2]) ?? 0,
+    cooldownSeconds: reader.readLongOrNull(offsets[1]) ?? 0,
+    energyCost: reader.readLongOrNull(offsets[2]) ?? 0,
+    generatesItemPath: reader.readStringOrNull(offsets[3]),
+    id: id,
+    itemImagePath: reader.readStringOrNull(offsets[8]),
+    lastUsedTimestamp: reader.readDateTimeOrNull(offsets[9]),
+    overlayNumber: reader.readLongOrNull(offsets[10]) ?? 0,
+    type: _TileDatatypeValueEnumMap[reader.readByteOrNull(offsets[11])] ??
+        TileType.empty,
   );
-  object.id = id;
   return object;
 }
 
@@ -99,13 +166,45 @@ P _tileDataDeserializeProp<P>(
     case 0:
       return (reader.readString(offset)) as P;
     case 1:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset) ?? 0) as P;
     case 2:
       return (reader.readLongOrNull(offset) ?? 0) as P;
+    case 3:
+      return (reader.readStringOrNull(offset)) as P;
+    case 4:
+      return (reader.readBool(offset)) as P;
+    case 5:
+      return (reader.readBool(offset)) as P;
+    case 6:
+      return (reader.readBool(offset)) as P;
+    case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 10:
+      return (reader.readLongOrNull(offset) ?? 0) as P;
+    case 11:
+      return (_TileDatatypeValueEnumMap[reader.readByteOrNull(offset)] ??
+          TileType.empty) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
 }
+
+const _TileDatatypeEnumValueMap = {
+  'empty': 0,
+  'item': 1,
+  'generator': 2,
+  'locked': 3,
+};
+const _TileDatatypeValueEnumMap = {
+  0: TileType.empty,
+  1: TileType.item,
+  2: TileType.generator,
+  3: TileType.locked,
+};
 
 Id _tileDataGetId(TileData object) {
   return object.id;
@@ -330,6 +429,269 @@ extension TileDataQueryFilter
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      cooldownSecondsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'cooldownSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      cooldownSecondsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'cooldownSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      cooldownSecondsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'cooldownSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      cooldownSecondsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'cooldownSeconds',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> energyCostEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'energyCost',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> energyCostGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'energyCost',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> energyCostLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'energyCost',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> energyCostBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'energyCost',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'generatesItemPath',
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'generatesItemPath',
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'generatesItemPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'generatesItemPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'generatesItemPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'generatesItemPath',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'generatesItemPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'generatesItemPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'generatesItemPath',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'generatesItemPath',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'generatesItemPath',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      generatesItemPathIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'generatesItemPath',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterFilterCondition> idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -378,6 +740,46 @@ extension TileDataQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> isEmptyEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isEmpty',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> isGeneratorEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isGenerator',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> isItemEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isItem',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> isLockedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isLocked',
+        value: value,
       ));
     });
   }
@@ -534,6 +936,80 @@ extension TileDataQueryFilter
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      lastUsedTimestampIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastUsedTimestamp',
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      lastUsedTimestampIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastUsedTimestamp',
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      lastUsedTimestampEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastUsedTimestamp',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      lastUsedTimestampGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastUsedTimestamp',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      lastUsedTimestampLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastUsedTimestamp',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition>
+      lastUsedTimestampBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastUsedTimestamp',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterFilterCondition> overlayNumberEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -587,6 +1063,59 @@ extension TileDataQueryFilter
       ));
     });
   }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> typeEqualTo(
+      TileType value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'type',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> typeGreaterThan(
+    TileType value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'type',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> typeLessThan(
+    TileType value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'type',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> typeBetween(
+    TileType lower,
+    TileType upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'type',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
 }
 
 extension TileDataQueryObject
@@ -608,6 +1137,90 @@ extension TileDataQuerySortBy on QueryBuilder<TileData, TileData, QSortBy> {
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByCooldownSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cooldownSeconds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByCooldownSecondsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cooldownSeconds', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByEnergyCost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'energyCost', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByEnergyCostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'energyCost', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByGeneratesItemPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatesItemPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByGeneratesItemPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatesItemPath', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isEmpty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsEmptyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isEmpty', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsGenerator() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerator', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsGeneratorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerator', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsItem() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isItem', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsItemDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isItem', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsLocked() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isLocked', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByIsLockedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isLocked', Sort.desc);
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterSortBy> sortByItemImagePath() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'itemImagePath', Sort.asc);
@@ -620,6 +1233,18 @@ extension TileDataQuerySortBy on QueryBuilder<TileData, TileData, QSortBy> {
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByLastUsedTimestamp() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUsedTimestamp', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByLastUsedTimestampDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUsedTimestamp', Sort.desc);
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterSortBy> sortByOverlayNumber() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'overlayNumber', Sort.asc);
@@ -629,6 +1254,18 @@ extension TileDataQuerySortBy on QueryBuilder<TileData, TileData, QSortBy> {
   QueryBuilder<TileData, TileData, QAfterSortBy> sortByOverlayNumberDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'overlayNumber', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'type', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'type', Sort.desc);
     });
   }
 }
@@ -647,6 +1284,42 @@ extension TileDataQuerySortThenBy
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByCooldownSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cooldownSeconds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByCooldownSecondsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'cooldownSeconds', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByEnergyCost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'energyCost', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByEnergyCostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'energyCost', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByGeneratesItemPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatesItemPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByGeneratesItemPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatesItemPath', Sort.desc);
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -656,6 +1329,54 @@ extension TileDataQuerySortThenBy
   QueryBuilder<TileData, TileData, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isEmpty', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsEmptyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isEmpty', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsGenerator() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerator', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsGeneratorDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerator', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsItem() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isItem', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsItemDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isItem', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsLocked() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isLocked', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByIsLockedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isLocked', Sort.desc);
     });
   }
 
@@ -671,6 +1392,18 @@ extension TileDataQuerySortThenBy
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByLastUsedTimestamp() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUsedTimestamp', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByLastUsedTimestampDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastUsedTimestamp', Sort.desc);
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterSortBy> thenByOverlayNumber() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'overlayNumber', Sort.asc);
@@ -680,6 +1413,18 @@ extension TileDataQuerySortThenBy
   QueryBuilder<TileData, TileData, QAfterSortBy> thenByOverlayNumberDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'overlayNumber', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'type', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'type', Sort.desc);
     });
   }
 }
@@ -694,6 +1439,50 @@ extension TileDataQueryWhereDistinct
     });
   }
 
+  QueryBuilder<TileData, TileData, QDistinct> distinctByCooldownSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'cooldownSeconds');
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByEnergyCost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'energyCost');
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByGeneratesItemPath(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'generatesItemPath',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isEmpty');
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByIsGenerator() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isGenerator');
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByIsItem() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isItem');
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByIsLocked() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isLocked');
+    });
+  }
+
   QueryBuilder<TileData, TileData, QDistinct> distinctByItemImagePath(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -702,9 +1491,21 @@ extension TileDataQueryWhereDistinct
     });
   }
 
+  QueryBuilder<TileData, TileData, QDistinct> distinctByLastUsedTimestamp() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastUsedTimestamp');
+    });
+  }
+
   QueryBuilder<TileData, TileData, QDistinct> distinctByOverlayNumber() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'overlayNumber');
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'type');
     });
   }
 }
@@ -723,15 +1524,71 @@ extension TileDataQueryProperty
     });
   }
 
+  QueryBuilder<TileData, int, QQueryOperations> cooldownSecondsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'cooldownSeconds');
+    });
+  }
+
+  QueryBuilder<TileData, int, QQueryOperations> energyCostProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'energyCost');
+    });
+  }
+
+  QueryBuilder<TileData, String?, QQueryOperations>
+      generatesItemPathProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'generatesItemPath');
+    });
+  }
+
+  QueryBuilder<TileData, bool, QQueryOperations> isEmptyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isEmpty');
+    });
+  }
+
+  QueryBuilder<TileData, bool, QQueryOperations> isGeneratorProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isGenerator');
+    });
+  }
+
+  QueryBuilder<TileData, bool, QQueryOperations> isItemProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isItem');
+    });
+  }
+
+  QueryBuilder<TileData, bool, QQueryOperations> isLockedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isLocked');
+    });
+  }
+
   QueryBuilder<TileData, String?, QQueryOperations> itemImagePathProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'itemImagePath');
     });
   }
 
+  QueryBuilder<TileData, DateTime?, QQueryOperations>
+      lastUsedTimestampProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastUsedTimestamp');
+    });
+  }
+
   QueryBuilder<TileData, int, QQueryOperations> overlayNumberProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'overlayNumber');
+    });
+  }
+
+  QueryBuilder<TileData, TileType, QQueryOperations> typeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'type');
     });
   }
 }

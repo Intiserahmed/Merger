@@ -3,23 +3,70 @@ import 'package:isar/isar.dart';
 
 part 'tile_data.g.dart'; // Isar generated code
 
+enum TileType {
+  empty, // Represents an empty, placeable tile
+  item, // Represents a standard mergeable item
+  generator, // Represents an item generator
+  locked, // Represents a tile not yet unlocked
+}
+
 @collection
 class TileData {
   Id id = Isar.autoIncrement; // Isar requires an Id field
 
-  late String baseImagePath; // Can be emoji or path
-  String? itemImagePath; // Nullable if no item, can be emoji or path
-  int overlayNumber; // 0 means no number
+  @enumerated
+  late TileType type;
 
-  // Default constructor for Isar
+  late String
+  baseImagePath; // Emoji or path for the base tile (e.g., grass, generator building)
+  String?
+  itemImagePath; // Emoji or path for the item on the tile (if type is item)
+  int overlayNumber; // Tier number for mergeable items
+
+  // --- Generator Specific Fields ---
+  String? generatesItemPath; // Item this generator produces (e.g., '⚔️')
+  int cooldownSeconds; // Cooldown duration in seconds
+  DateTime? lastUsedTimestamp; // When the generator was last activated
+  int energyCost; // Energy required to activate
+
+  // Default constructor for Isar & general use
   TileData({
+    this.id = Isar.autoIncrement,
+    this.type = TileType.empty, // Default to empty
     required this.baseImagePath,
     this.itemImagePath,
     this.overlayNumber = 0,
+    this.generatesItemPath,
+    this.cooldownSeconds = 0, // Default to no cooldown unless specified
+    this.lastUsedTimestamp,
+    this.energyCost = 0, // Default to free activation
   });
 
+  // --- Convenience Getters ---
+  bool get isGenerator => type == TileType.generator;
+  bool get isItem => type == TileType.item;
+  bool get isEmpty => type == TileType.empty;
+  bool get isLocked => type == TileType.locked;
+
+  @ignore
+  Duration get cooldownDuration => Duration(seconds: cooldownSeconds);
+
+  @ignore
+  bool get isReady {
+    if (!isGenerator) return false; // Only generators have readiness state
+    if (lastUsedTimestamp == null) return true; // Never used, so ready
+    return DateTime.now().difference(lastUsedTimestamp!) >= cooldownDuration;
+  }
+
+  @ignore
+  Duration get remainingCooldown {
+    if (!isGenerator || isReady) return Duration.zero;
+    final elapsed = DateTime.now().difference(lastUsedTimestamp!);
+    return cooldownDuration - elapsed;
+  }
+
   // Note: Removed copyWith, ==, and hashCode as Isar manages object identity
-  // and mutability is expected.
+  // and mutability is expected. We might need custom copy logic later if needed.
 }
 
 // Helper class for drag data - can stay here or move to grid provider/widget file
