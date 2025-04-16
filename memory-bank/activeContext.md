@@ -48,19 +48,35 @@ Overhauling the UI, adding a Map Screen, and refining the Game Grid Screen based
     *   Implemented a `StateProvider` (`lib/providers/navigation_provider.dart`) to manage the active screen index.
     *   Added a `FloatingActionButton` to both `GameGridScreen` and `MapScreen` to toggle between the screens.
     *   Modified `lib/main.dart` to use the `activeScreenIndexProvider` to display the correct screen.
+*   **New Merge Sequence (Tools):**
+    *   Added a new "Tool" merge sequence (`🔧` -> `🔨` -> `🔩` -> `⚙️` -> `🔗`) in `lib/providers/grid_provider.dart`.
+    *   Added corresponding merge logic and XP rewards in `GridNotifier.mergeTiles`.
+    *   Added a new "Workshop" generator (`🏭`) definition and placement logic (`placeGenerator`) in `lib/providers/grid_provider.dart` to spawn the base tool (`🔧`).
+*   **Game Grid Screen UI Overhaul (`lib/widgets/game_grid_screen.dart`):**
+    *   Replaced the top status bar (`_buildTopArea`, `_buildResourceBar`) with a new HUD layout using placeholder emojis/icons (`👤`, `🪙`).
+    *   Replaced the order display (`_buildOrderDisplay`) with a new layout showing only the first order, using placeholder emojis (`🧑`).
+    *   Replaced the bottom info bar placeholder (`_buildBottomInfoBarPlaceholder`) with a new layout (`_buildBottomInfoBar`) using placeholder emojis (`ℹ️`).
+    *   Added subtle drop shadows to item tiles in `_buildTile`.
+    *   Added a placeholder star background concept (`⭐`) behind item tiles in `_buildTile`.
 
 ## Next Steps
 
 *   **Map Screen Implementation:** Replace the placeholder in `MapScreen` with actual map graphics and interactive elements.
-*   **Grid UI Refinement:** Further adjust grid tile sizing and layout for optimal appearance. Replace placeholder elements with final UI components.
-*   **Refactor Shared UI:** Extract the duplicated status bar code (`_buildTopArea`, `_buildResourceBar`) from `GameGridScreen` and `MapScreen` into a reusable widget.
-*   **Content Expansion:** Continue adding more items, generators, orders, and zones.
-*   **Balancing:** Fine-tune XP, costs, rewards, and unlock requirements.
+*   **Grid UI Refinement:**
+    *   Replace placeholder emojis/icons in the Top HUD, Order Display, and Bottom Info Bar with actual assets or final icons.
+    *   Implement dynamic text updates for the Bottom Info Bar based on selected tile.
+    *   Implement the energy cooldown display in the Top HUD.
+    *   Refine the "star tile" background implementation for items.
+    *   Further adjust grid tile sizing and layout for optimal appearance.
+*   **Refactor Shared UI:** Extract the duplicated status bar code (`_buildTopArea`, `_buildTopResource`) from `GameGridScreen` and `MapScreen` into a reusable widget.
+*   **Content Expansion:** Continue adding more items, generators (e.g., place Workshop generator in initial grid), orders, and zones.
+*   **Balancing:** Fine-tune XP, costs, rewards, and unlock requirements for both merge sequences.
 *   **Testing:** Implement automated tests.
 
 ## Active Decisions and Considerations
 
-*   **Shared UI Components:** The status bar logic is currently duplicated and should be refactored for better maintainability.
+*   **Shared UI Components:** The new Top HUD logic is currently only in `GameGridScreen` and needs to be added to `MapScreen` and potentially refactored.
+*   **Placeholders:** The UI currently uses placeholder emojis/icons and static text in some areas (Bottom Info Bar).
 *   **Data Modeling:** (Existing consideration) Evaluate grid state storage efficiency.
 *   **Save Frequency:** (Existing consideration) Determine optimal save frequency.
 *   **Error Handling:** (Existing consideration) Improve Isar error handling.

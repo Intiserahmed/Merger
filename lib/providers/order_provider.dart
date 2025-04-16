@@ -26,7 +26,7 @@ final List<Order> _possibleOrders = [
   ),
   Order(
     id: 'order_star_3',
-    requiredItemId: '⭐',
+    requiredItemId: '🌳',
     requiredCount: 3,
     rewardCoins: 200,
     rewardXp: 50,

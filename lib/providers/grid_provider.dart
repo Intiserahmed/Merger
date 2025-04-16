@@ -27,10 +27,24 @@ const List<String> plantSequence = [
   '🌵',
 ]; // Seedling -> Herb -> Tree -> Evergreen -> Palm -> Cactus
 
+// --- Tool Merge Sequence ---
+const List<String> toolSequence = [
+  '🔧', // Wrench
+  '🔨', // Hammer
+  '🔩', // Nut and Bolt
+  '⚙️', // Gear
+  '🔗', // Link
+];
+
+// --- Generator Definitions ---
+const String workshopEmoji = '🏭'; // New Workshop Generator
+
 const int barracksCooldown = 15; // seconds
 const int mineCooldown = 30; // seconds
+const int workshopCooldown = 20; // seconds
 const int barracksEnergyCost = 5;
 const int mineEnergyCost = 2;
+const int workshopEnergyCost = 3;
 
 // Constants moved from expansion_provider to be central here
 const int rowCount = 11; // Keep existing grid size for now
@@ -312,6 +326,46 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         return;
       }
     }
+    // --- NEW Tool Merge Logic ---
+    else if (targetTile.itemImagePath != null &&
+        targetTile.itemImagePath == sourceTile.itemImagePath &&
+        toolSequence.contains(targetTile.itemImagePath)) {
+      final currentIndex = toolSequence.indexOf(targetTile.itemImagePath!);
+      if (currentIndex < toolSequence.length - 1) {
+        // Check if there's a next level
+        final nextItemPath = toolSequence[currentIndex + 1];
+        final newTargetData = TileData(
+          row: targetRow,
+          col: targetCol,
+          type: TileType.item,
+          baseImagePath: targetTile.baseImagePath,
+          itemImagePath: nextItemPath,
+          overlayNumber: 0,
+        );
+        final newSourceData = TileData(
+          row: sourceRow,
+          col: sourceCol,
+          type: TileType.empty,
+          baseImagePath: defaultEmptyBase,
+        );
+
+        final newGrid =
+            currentGrid.map((row) => List<TileData>.from(row)).toList();
+        newGrid[targetRow][targetCol] = newTargetData;
+        newGrid[sourceRow][sourceCol] = newSourceData;
+        state = newGrid;
+
+        // --- Add XP for Tool Merge ---
+        final xpGained =
+            (currentIndex + 1) * 6; // Example: 6 XP, 12 XP, 18 XP etc.
+        ref.read(playerStatsProvider.notifier).addXp(xpGained);
+        print("Gained $xpGained XP for merging into $nextItemPath");
+        return; // Merge handled, exit function
+      } else {
+        print("Already at max tool level: ${targetTile.itemImagePath}");
+        return;
+      }
+    }
     // --- Existing Item Merge Logic (Shell, Sword) ---
     else if (targetTile.itemImagePath != null && // Target must have an item
         targetTile.itemImagePath ==
@@ -488,6 +542,16 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         generatesItemPath: coinEmoji,
         cooldownSeconds: mineCooldown,
         energyCost: mineEnergyCost,
+      );
+    } else if (generatorEmoji == workshopEmoji) {
+      generatorData = TileData(
+        row: row,
+        col: col,
+        type: TileType.generator,
+        baseImagePath: generatorEmoji,
+        generatesItemPath: toolSequence[0], // Generate base tool 🔧
+        cooldownSeconds: workshopCooldown,
+        energyCost: workshopEnergyCost,
       );
     } else {
       print("Unknown generator type: $generatorEmoji");

@@ -137,25 +137,43 @@ class GameGridScreen extends ConsumerWidget {
               color: Colors.black.withOpacity(0.2),
               width: 0.5,
             ),
+            boxShadow:
+                tileData.isItem
+                    ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 3.0,
+                        offset: const Offset(1, 1),
+                      ),
+                    ]
+                    : null, // Add shadow only to items
             borderRadius: BorderRadius.circular(4.0),
           ),
           child: Stack(
             fit: StackFit.expand,
             alignment: Alignment.center,
             children: [
-              // --- Base Layer (Only show if different from background, e.g., generator) ---
+              // --- Base Layer (Generator/Locked) ---
               if (tileData.isGenerator || tileData.isLocked)
                 _buildTileContent(
                   tileData.baseImagePath,
-                  fit: BoxFit.contain, // Generators might not fill
+                  fit: BoxFit.contain,
                   size: 30,
+                ),
+              // --- Item Background (Star concept for items) ---
+              if (tileData.isItem)
+                const Center(
+                  child: Text(
+                    '⭐', // Placeholder for star tile background
+                    style: TextStyle(fontSize: 40, color: Colors.black12),
+                  ),
                 ),
               // --- Item Layer (Conditional) ---
               if (tileData.itemImagePath != null)
                 _buildTileContent(
                   tileData.itemImagePath!,
                   fit: BoxFit.contain,
-                  size: 28, // Slightly smaller for item
+                  size: 28, // Slightly smaller for item on top of star
                 ),
               // --- Cooldown Overlay for Generators ---
               if (tileData.isGenerator && !tileData.isReady)
@@ -297,17 +315,16 @@ class GameGridScreen extends ConsumerWidget {
     );
   }
 
-  // --- Build Top Area (Level + Status Bars) ---
+  // --- NEW Build Top Area (HUD) ---
   Widget _buildTopArea(BuildContext context, WidgetRef ref) {
-    // Watch the whole PlayerStats object
     final playerStats = ref.watch(playerStatsProvider);
-    // Access individual stats from the object
     final level = playerStats.level;
     final energy = playerStats.energy;
-    final maxEnergy = playerStats.maxEnergy; // Get maxEnergy from PlayerStats
+    // final maxEnergy = playerStats.maxEnergy; // Not used in new design directly
     final coins = playerStats.coins;
-    final gems =
-        playerStats.gems; // Assuming gems is added to PlayerStats model
+    final gems = playerStats.gems;
+    // TODO: Get energy cooldown timer if available
+    final energyCooldown = null; // Placeholder
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -318,83 +335,94 @@ class GameGridScreen extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // --- Level Indicator ---
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade900,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.lightBlueAccent, width: 1.5),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.star, color: Colors.yellowAccent, size: 20),
-                const SizedBox(width: 6),
-                Text(
-                  '$level',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // --- Resource Bars ---
+          // Profile icon with level
           Row(
             children: [
-              _buildResourceBar('⚡', '$energy/$maxEnergy', Colors.yellow),
-              const SizedBox(width: 10),
-              _buildResourceBar('💰', '$coins', Colors.amber),
-              const SizedBox(width: 10),
-              _buildResourceBar('💎', '$gems', Colors.purpleAccent),
+              // Placeholder for CircleAvatar with AssetImage
+              const CircleAvatar(
+                backgroundColor: Colors.grey, // Placeholder color
+                radius: 20,
+                child: Text(
+                  '👤',
+                  style: TextStyle(fontSize: 24),
+                ), // Placeholder icon
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.blueAccent, width: 2),
+                ),
+                child: Text(
+                  '$level',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
-        ],
-      ),
-    );
-  }
 
-  // Helper for individual resource bars in the status bar
-  Widget _buildResourceBar(String icon, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withOpacity(0.8), width: 1),
-      ),
-      child: Row(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+          // Energy
+          _buildTopResource(
+            icon: '⚡',
+            value: '$energy', // Show current energy
+            cooldown: energyCooldown, // Pass cooldown if available
           ),
+
+          // Coins (Using coin emoji as placeholder for clover)
+          _buildTopResource(icon: '🪙', value: '$coins'),
+
+          // Gems
+          _buildTopResource(icon: '💎', value: '$gems'),
         ],
       ),
     );
   }
 
-  // --- Build Bottom Info Bar Placeholder ---
-  Widget _buildBottomInfoBarPlaceholder() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      color: Colors.blueGrey.shade700,
-      child: const Row(
-        children: [
-          Icon(Icons.info_outline, color: Colors.white70, size: 20),
-          SizedBox(width: 10),
+  // --- NEW Helper for Top HUD Resources ---
+  Widget _buildTopResource({
+    required String icon,
+    required String value,
+    String? cooldown,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min, // Prevent column taking too much space
+      children: [
+        Text(icon, style: const TextStyle(fontSize: 18)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        if (cooldown != null)
           Text(
-            "Placeholder: Merge items to reach next level.", // Placeholder text
-            style: TextStyle(color: Colors.white, fontSize: 14),
+            cooldown,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.white70,
+            ), // Adjusted color
+          ),
+      ],
+    );
+  }
+
+  // --- NEW Build Bottom Info Bar ---
+  Widget _buildBottomInfoBar() {
+    // TODO: Make text dynamic based on selected tile
+    const String infoText =
+        "Seashell. Merge to reach next level."; // Placeholder
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: const [
+          // Placeholder for Icon(Icons.info_outline)
+          Text('ℹ️', style: TextStyle(fontSize: 18)),
+          SizedBox(width: 8),
+          Text(
+            infoText,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.black87,
+            ), // Adjusted color
           ),
         ],
       ),
@@ -455,6 +483,8 @@ class GameGridScreen extends ConsumerWidget {
               ),
             ],
           ),
+          // --- Order Display Area ---
+          _buildOrderDisplay(context, ref),
 
           // --- Game Grid ---
           Expanded(
@@ -480,11 +510,8 @@ class GameGridScreen extends ConsumerWidget {
             ),
           ),
 
-          // --- Order Display Area ---
-          _buildOrderDisplay(context, ref),
-
           // --- Bottom Info Bar ---
-          _buildBottomInfoBarPlaceholder(),
+          _buildBottomInfoBar(), // Use new bottom bar
         ],
       ),
       // --- Floating Action Buttons ---
@@ -587,13 +614,13 @@ class GameGridScreen extends ConsumerWidget {
     );
   }
 
-  // --- Helper Widget to Display Orders (Keep as is for now) ---
+  // --- NEW Helper Widget to Display Orders ---
   Widget _buildOrderDisplay(BuildContext context, WidgetRef ref) {
     final orders = ref.watch(orderProvider);
 
     if (orders.isEmpty) {
       return const SizedBox(
-        height: 60,
+        height: 80, // Adjusted height
         child: Center(
           child: Text(
             "No active orders.",
@@ -603,54 +630,66 @@ class GameGridScreen extends ConsumerWidget {
       );
     }
 
+    // Display only the first order for simplicity, matching the new design
+    final order = orders.first;
+    // Placeholder for reward text (assuming coins)
+    final rewardText =
+        '+${order.rewardCoins}'; // Use rewardCoins from Order model
+
     return Container(
-      height: 100,
-      color: Colors.black.withOpacity(0.2), // Darker background
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: orders.length,
-        itemBuilder: (context, index) {
-          final order = orders[index];
-          return Card(
-            color: Colors.blueGrey.shade800, // Darker card
-            margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: _buildTileContent(order.requiredItemId, size: 24),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "x ${order.requiredCount}",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white, // White text
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600, // Button color
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(60, 25),
-                      textStyle: const TextStyle(fontSize: 12),
-                    ),
-                    onPressed: () {
-                      ref.read(orderProvider.notifier).attemptDelivery(order);
-                    },
-                    child: const Text("Deliver"),
-                  ),
-                ],
-              ),
+      height: 80, // Adjusted height
+      color: Colors.black.withOpacity(0.2),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center, // Center the content
+        children: [
+          // Placeholder for NPC CircleAvatar
+          const CircleAvatar(
+            backgroundColor: Colors.brown, // Placeholder color
+            radius: 30,
+            child: Text(
+              '🧑',
+              style: TextStyle(fontSize: 30),
+            ), // Placeholder icon
+          ),
+          const SizedBox(width: 8), // Adjusted spacing
+          ElevatedButton(
+            onPressed: () {
+              ref.read(orderProvider.notifier).attemptDelivery(order);
+            },
+            style: ElevatedButton.styleFrom(
+              shape: const StadiumBorder(),
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
-          );
-        },
+            child: const Text('GO', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 8), // Adjusted spacing
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                rewardText,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.yellowAccent, // Highlight reward
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Placeholder for Item Image
+              SizedBox(
+                width: 35,
+                height: 35,
+                child: _buildTileContent(order.requiredItemId, size: 30),
+              ),
+              // Text( // Optional: Show required count if needed
+              //   'x ${order.requiredCount}',
+              //   style: const TextStyle(color: Colors.white70, fontSize: 10),
+              // ),
+            ],
+          ),
+        ],
       ),
     );
   }
