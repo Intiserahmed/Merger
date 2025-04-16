@@ -1,34 +1,34 @@
 // lib/widgets/game_grid_screen.dart (or wherever your screen is)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:merger/models/order.dart'; // Import Order model
-import 'package:merger/providers/order_provider.dart'; // Import Order provider
-import 'package:merger/models/tile_unlock.dart'; // Import TileUnlock and Point
-import 'package:merger/providers/expansion_provider.dart'; // Import expansion providers
+import 'package:merger/models/order.dart';
+import 'package:merger/providers/order_provider.dart';
+import 'package:merger/models/tile_unlock.dart';
+import 'package:merger/providers/expansion_provider.dart';
 import 'package:merger/main.dart'; // Import main to access global isar instance
-import 'package:merger/persistence/game_service.dart'; // Import GameService
+import 'package:merger/persistence/game_service.dart';
 
-import 'dart:math' as math; // For Point class if needed elsewhere
+import 'dart:math' as math;
 import '../models/tile_data.dart';
-import '../providers/grid_provider.dart' as grid; // Use prefix
+import '../providers/grid_provider.dart' as grid;
 import '../providers/player_provider.dart';
-import '../providers/navigation_provider.dart'; // Import navigation provider
+import '../providers/navigation_provider.dart';
+import '../models/merge_trees.dart';
+import '../models/generator_config.dart';
 
 // Define colors for the chessboard pattern
 final Color lightBrown = Colors.brown[300]!;
 final Color darkBrown = Colors.brown[600]!;
-final Color grassGreen = Colors.green[400]!; // For grass base tiles
+final Color grassGreen = Colors.green[400]!;
 
 class GameGridScreen extends ConsumerWidget {
   const GameGridScreen({super.key});
 
-  // --- Helper to build Tile Content (Emoji or Image) ---
   Widget _buildTileContent(
     String pathOrEmoji, {
     BoxFit fit = BoxFit.contain,
-    double size = 28, // Default size, can be overridden
+    double size = 28,
   }) {
-    // Simple check: if it contains '/', assume it's a path
     if (pathOrEmoji.contains('/')) {
       return Image.asset(
         pathOrEmoji,
@@ -43,43 +43,29 @@ class GameGridScreen extends ConsumerWidget {
             ),
       );
     } else {
-      // Assume it's an emoji
-      return Center(
-        child: Text(
-          pathOrEmoji,
-          style: TextStyle(fontSize: size), // Adjust emoji size via parameter
-        ),
-      );
+      return Center(child: Text(pathOrEmoji, style: TextStyle(fontSize: size)));
     }
   }
 
-  // --- Build Tile Widget ---
   Widget _buildTile(BuildContext context, WidgetRef ref, int index) {
-    // Use prefixed constants
     final int row = index ~/ grid.colCount;
     final int col = index % grid.colCount;
-    final gridData = ref.watch(grid.gridProvider); // Use prefixed provider
+    final gridData = ref.watch(grid.gridProvider);
 
-    // Use gridData dimensions for safety, though constants should match
     if (row >= gridData.length || col >= gridData[0].length) {
-      // Assuming grid is not empty
-      return Container(color: Colors.red.withOpacity(0.2)); // Error indicator
+      return Container(color: Colors.red.withOpacity(0.2));
     }
     final TileData tileData = gridData[row][col];
 
-    // Determine background color based on chessboard pattern and base image
     Color backgroundColor;
     if (tileData.baseImagePath == '🟩') {
-      // Grass tiles are always green
       backgroundColor = grassGreen;
     } else if (tileData.isLocked) {
-      backgroundColor = Colors.grey.shade500; // Locked tiles are grey
+      backgroundColor = Colors.grey.shade500;
     } else {
-      // Chessboard pattern for non-grass, unlocked tiles
       backgroundColor = (row + col) % 2 == 0 ? lightBrown : darkBrown;
     }
 
-    // --- Drag Target Logic ---
     return DragTarget<TileDropData>(
       onWillAccept: (dragData) {
         if (dragData == null || (dragData.row == row && dragData.col == col)) {
@@ -88,49 +74,32 @@ class GameGridScreen extends ConsumerWidget {
         final targetTile = tileData;
         final sourceTile = dragData.tileData;
 
-        // Prevent dropping onto locked tiles
         if (targetTile.isLocked) return false;
 
-        // --- NEW Merge Logic Check (based on provider logic) ---
-        // Check if items are identical and part of the plant sequence
         if (targetTile.itemImagePath != null &&
-            targetTile.itemImagePath == sourceTile.itemImagePath &&
-            grid.plantSequence.contains(targetTile.itemImagePath)) {
-          // Check if it's not the max level
-          final currentIndex = grid.plantSequence.indexOf(
-            targetTile.itemImagePath!,
-          );
-          return currentIndex < grid.plantSequence.length - 1;
+            targetTile.itemImagePath == sourceTile.itemImagePath) {
+          final nextItem = getNextItemInSequence(targetTile.itemImagePath!);
+          if (nextItem != null) {
+            return true;
+          } else if (targetTile.itemImagePath == '🐚' ||
+              targetTile.itemImagePath == '⚔️') {
+            return true;
+          }
         }
-        // Check for other specific item merges (e.g., Shell, Sword)
-        else if (targetTile.itemImagePath != null &&
-            targetTile.itemImagePath == sourceTile.itemImagePath &&
-            (targetTile.itemImagePath == '🐚' ||
-                targetTile.itemImagePath == '⚔️')) {
-          // Add specific checks if needed (e.g., prevent merging sword into shield if shield exists)
-          return true;
-        }
-        // Allow dropping onto an empty tile (if needed for placement logic later)
-        // else if (targetTile.isEmpty) {
-        //   return true; // Or add specific placement rules
-        // }
 
-        return false; // Default: don't accept drop
+        return false;
       },
       onAccept: (dragData) {
-        // Only call merge if it's a valid merge target based on onWillAccept logic
-        // (We assume onWillAccept correctly filtered)
         ref
-            .read(grid.gridProvider.notifier) // Use prefix
+            .read(grid.gridProvider.notifier)
             .mergeTiles(row, col, dragData.row, dragData.col);
       },
       builder: (context, candidateData, rejectedData) {
-        // --- Visual Representation (No more number overlay) ---
         Widget content = Container(
           key: ValueKey(
-            'tile_${row}_${col}_${tileData.type}_${tileData.itemImagePath ?? 'base'}',
+            'tile_${row}_${col}_${tileData.type}_${tileData.itemImagePath ?? 'base'}', // Corrected interpolation
           ),
-          margin: const EdgeInsets.all(1.0), // Small margin between tiles
+          margin: const EdgeInsets.all(1.0),
           decoration: BoxDecoration(
             color: backgroundColor,
             border: Border.all(
@@ -146,7 +115,7 @@ class GameGridScreen extends ConsumerWidget {
                         offset: const Offset(1, 1),
                       ),
                     ]
-                    : null, // Add shadow only to items
+                    : null,
             borderRadius: BorderRadius.circular(4.0),
           ),
           child: Stack(
@@ -178,7 +147,7 @@ class GameGridScreen extends ConsumerWidget {
                     ),
                     child: Center(
                       child: Text(
-                        '${tileData.remainingCooldown.inSeconds}s',
+                        '${tileData.remainingCooldown.inSeconds}s', // Corrected interpolation
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -223,7 +192,9 @@ class GameGridScreen extends ConsumerWidget {
               height: 50, // Match new smaller size
               child: Container(
                 // Rebuild the tile content *without* the item layer
-                key: ValueKey('dragging_${row}_${col}'), // Unique key
+                key: ValueKey(
+                  'dragging_${row}_$col',
+                ), // Corrected interpolation
                 margin: const EdgeInsets.all(1.0),
                 decoration: BoxDecoration(
                   color: backgroundColor, // Keep original background
@@ -290,7 +261,7 @@ class GameGridScreen extends ConsumerWidget {
                       content: Text(
                         success
                             ? "Zone '${targetUnlock.id}' unlocked!"
-                            : "Failed to unlock zone. Check level (${targetUnlock.requiredLevel}) and coins (${targetUnlock.unlockCostCoins}).",
+                            : "Failed to unlock zone. Check level (${targetUnlock.requiredLevel}) and coins (${targetUnlock.unlockCostCoins}).", // Corrected interpolation
                       ),
                       duration: const Duration(seconds: 2),
                     ),
@@ -311,7 +282,7 @@ class GameGridScreen extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        "Zone locked. Requires Level ${actualZone.requiredLevel}.",
+                        "Zone locked. Requires Level ${actualZone.requiredLevel}.", // Corrected interpolation
                       ),
                       duration: const Duration(seconds: 1),
                     ),
@@ -373,7 +344,7 @@ class GameGridScreen extends ConsumerWidget {
                   border: Border.all(color: Colors.blueAccent, width: 2),
                 ),
                 child: Text(
-                  '$level',
+                  '$level', // Corrected interpolation
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -383,15 +354,20 @@ class GameGridScreen extends ConsumerWidget {
           // Energy
           _buildTopResource(
             icon: '⚡',
-            value: '$energy', // Show current energy
+            value: '$energy', // Corrected interpolation
             cooldown: energyCooldown, // Pass cooldown if available
           ),
 
           // Coins (Using coin emoji as placeholder for clover)
-          _buildTopResource(icon: '🪙', value: '$coins'),
-
+          _buildTopResource(
+            icon: '🪙',
+            value: '$coins',
+          ), // Corrected interpolation
           // Gems
-          _buildTopResource(icon: '💎', value: '$gems'),
+          _buildTopResource(
+            icon: '💎',
+            value: '$gems',
+          ), // Corrected interpolation
         ],
       ),
     );
@@ -446,7 +422,6 @@ class GameGridScreen extends ConsumerWidget {
     );
   }
 
-  // --- Main Build Method ---
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Get screen size for potential adjustments
@@ -468,11 +443,11 @@ class GameGridScreen extends ConsumerWidget {
             children: [
               IconButton(
                 icon: const Icon(Icons.build, color: Colors.white54),
-                tooltip: 'Place Barracks (Debug)',
+                tooltip: 'Place Camp (Debug)',
                 onPressed: () {
                   ref
                       .read(grid.gridProvider.notifier)
-                      .placeGenerator(1, 1, grid.barracksEmoji);
+                      .placeGenerator(1, 1, '🏕️');
                 },
               ),
               IconButton(
@@ -481,13 +456,23 @@ class GameGridScreen extends ConsumerWidget {
                 onPressed: () {
                   ref
                       .read(grid.gridProvider.notifier)
-                      .placeGenerator(2, 2, grid.mineEmoji);
+                      .placeGenerator(2, 2, '⛏️');
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.factory, color: Colors.white54),
+                tooltip: 'Place Workshop (Debug)',
+                onPressed: () {
+                  ref
+                      .read(grid.gridProvider.notifier)
+                      .placeGenerator(3, 3, '🏭');
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.save, color: Colors.white54),
                 tooltip: 'Save Game State (Debug)',
                 onPressed: () async {
+                  // Corrected way to access container for GameService
                   final container = ProviderScope.containerOf(context);
                   await GameService(isar, container).saveGame();
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -501,8 +486,7 @@ class GameGridScreen extends ConsumerWidget {
             ],
           ),
           // --- Order Display Area ---
-          _buildOrderDisplay(context, ref),
-
+          _buildOrderDisplay(context, ref), // Corrected call
           // --- Game Grid ---
           Expanded(
             // Grid takes remaining space
@@ -520,8 +504,10 @@ class GameGridScreen extends ConsumerWidget {
                     mainAxisSpacing: 2.0, // Spacing between rows
                     crossAxisSpacing: 2.0, // Spacing between columns
                   ),
-                  itemBuilder:
-                      (context, index) => _buildTile(context, ref, index),
+                  itemBuilder: (BuildContext context, int index) {
+                    // Corrected signature
+                    return _buildTile(context, ref, index);
+                  },
                 ),
               ),
             ),
@@ -542,25 +528,38 @@ class GameGridScreen extends ConsumerWidget {
             onPressed: () {
               final playerNotifier = ref.read(playerStatsProvider.notifier);
               final gridNotifier = ref.read(grid.gridProvider.notifier);
-              final bool energySpent = playerNotifier.spendEnergy(
-                spawnEnergyCost,
-              );
+              // Get spawn cost from the plant generator ('🏕️') config
+              final plantConfig = generatorConfigs['🏕️'];
+              final cost =
+                  plantConfig?.energyCost ?? 2; // Default if config missing
+
+              final bool energySpent = playerNotifier.spendEnergy(cost);
 
               if (energySpent) {
-                // Spawn the base plant item
-                final bool itemSpawned = gridNotifier.spawnItemOnFirstEmpty(
-                  grid.plantSequence[0],
-                );
-
-                if (!itemSpawned) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("No empty space to spawn an item!"),
-                      duration: Duration(seconds: 1),
-                    ),
+                // Spawn the base plant item using mergeTrees
+                final basePlantItem = mergeTrees['plant']?.first;
+                if (basePlantItem != null) {
+                  final bool itemSpawned = gridNotifier.spawnItemOnFirstEmpty(
+                    basePlantItem,
                   );
-                  // Optional refund
-                  // playerNotifier.addEnergy(spawnEnergyCost);
+
+                  if (!itemSpawned) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("No empty space to spawn an item!"),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                    playerNotifier.addEnergy(
+                      cost,
+                    ); // Refund only if spawn failed
+                  }
+                  // Don't refund if spawn succeeded
+                } else {
+                  print("Error: Base plant item not found in mergeTrees.");
+                  playerNotifier.addEnergy(
+                    cost,
+                  ); // Refund if base item not found
                 }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -573,7 +572,9 @@ class GameGridScreen extends ConsumerWidget {
             },
             label: const Text('Spawn 🌱'), // Update label
             icon: const Icon(Icons.add_circle_outline),
-            tooltip: 'Costs $spawnEnergyCost energy',
+            // Update tooltip dynamically based on config cost
+            tooltip:
+                'Costs ${generatorConfigs['🏕️']?.energyCost ?? '?'} energy', // Corrected interpolation
             backgroundColor: Colors.teal, // Example color
           ),
           const SizedBox(width: 10), // Spacing between FABs
@@ -590,44 +591,6 @@ class GameGridScreen extends ConsumerWidget {
           ),
         ],
       ),
-      /* // Original FAB code:
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          final playerNotifier = ref.read(playerStatsProvider.notifier);
-          final gridNotifier = ref.read(grid.gridProvider.notifier);
-          final bool energySpent = playerNotifier.spendEnergy(spawnEnergyCost);
-
-          if (energySpent) {
-            // Spawn the base plant item
-            final bool itemSpawned = gridNotifier.spawnItemOnFirstEmpty(
-              grid.plantSequence[0],
-            );
-
-            if (!itemSpawned) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("No empty space to spawn an item!"),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-              // Optional refund
-              // playerNotifier.addEnergy(spawnEnergyCost);
-            }
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Not enough energy to spawn an item!"),
-                duration: Duration(seconds: 1),
-              ),
-            );
-          }
-        },
-        label: const Text('Spawn 🌱'), // Update label
-        icon: const Icon(Icons.add_circle_outline),
-        tooltip: 'Costs $spawnEnergyCost energy',
-        backgroundColor: Colors.teal, // Example color
-      ),
-      */
     );
   }
 
@@ -637,7 +600,7 @@ class GameGridScreen extends ConsumerWidget {
 
     if (orders.isEmpty) {
       return const SizedBox(
-        height: 80, // Adjusted height
+        height: 80,
         child: Center(
           child: Text(
             "No active orders.",
@@ -650,11 +613,10 @@ class GameGridScreen extends ConsumerWidget {
     // Display only the first order for simplicity, matching the new design
     final order = orders.first;
     // Placeholder for reward text (assuming coins)
-    final rewardText =
-        '+${order.rewardCoins}'; // Use rewardCoins from Order model
+    final rewardText = '+${order.rewardCoins}'; // Corrected interpolation
 
     return Container(
-      height: 80, // Adjusted height
+      height: 80,
       color: Colors.black.withOpacity(0.2),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(

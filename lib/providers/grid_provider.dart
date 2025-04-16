@@ -6,47 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // import 'package:collection/collection.dart'; // Not currently used
 import '../models/tile_data.dart';
 import '../models/tile_unlock.dart'; // Import TileUnlock
+import '../models/merge_trees.dart'; // Import the new merge tree logic
+import '../models/generator_config.dart'; // Import the new generator config
 import 'player_provider.dart'; // Import player provider for energy checks
 import 'expansion_provider.dart'; // Import expansion provider
 
-// --- Generator Definitions ---
-const String barracksEmoji = '🏕️';
-const String mineEmoji = '⛏️';
-const String swordEmoji = '⚔️'; // Keep for potential other uses/orders
+// --- Constants ---
+// Keep emojis/constants potentially used outside generator/merge logic
+const String swordEmoji = '⚔️';
 const String coinEmoji = '💰';
-const String lockedEmoji = '🔒'; // Emoji for locked tiles
-const String defaultEmptyBase = '🟫'; // Default base for empty/unlocked tiles
+const String lockedEmoji = '🔒';
+const String defaultEmptyBase = '🟫';
+const String mineEmoji =
+    '⛏️'; // Keep if Mine is used for non-sequence generation (e.g., coins)
 
-// --- Plant Merge Sequence ---
-const List<String> plantSequence = [
-  '🌱',
-  '🌿',
-  '🌳',
-  '🌲',
-  '🌴',
-  '🌵',
-]; // Seedling -> Herb -> Tree -> Evergreen -> Palm -> Cactus
-
-// --- Tool Merge Sequence ---
-const List<String> toolSequence = [
-  '🔧', // Wrench
-  '🔨', // Hammer
-  '🔩', // Nut and Bolt
-  '⚙️', // Gear
-  '🔗', // Link
-];
-
-// --- Generator Definitions ---
-const String workshopEmoji = '🏭'; // New Workshop Generator
-
-const int barracksCooldown = 15; // seconds
-const int mineCooldown = 30; // seconds
-const int workshopCooldown = 20; // seconds
-const int barracksEnergyCost = 5;
-const int mineEnergyCost = 2;
-const int workshopEnergyCost = 3;
-
-// Constants moved from expansion_provider to be central here
+// Grid dimensions
 const int rowCount = 9; // New: 9 rows
 const int colCount = 7; // New: 7 columns
 
@@ -284,116 +258,20 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       return;
     }
 
-    // --- NEW Plant Merge Logic ---
+    // --- Refactored Merge Logic using merge_trees.dart ---
     if (targetTile.itemImagePath != null &&
-        targetTile.itemImagePath == sourceTile.itemImagePath &&
-        plantSequence.contains(targetTile.itemImagePath)) {
-      final currentIndex = plantSequence.indexOf(targetTile.itemImagePath!);
-      if (currentIndex < plantSequence.length - 1) {
-        // Check if there's a next level
-        final nextItemPath = plantSequence[currentIndex + 1];
+        targetTile.itemImagePath == sourceTile.itemImagePath) {
+      // Check if these items can merge into a next-level item
+      final nextItemPath = getNextItemInSequence(targetTile.itemImagePath!);
+
+      if (nextItemPath != null) {
+        // Merge is possible according to mergeTrees
         final newTargetData = TileData(
           row: targetRow,
           col: targetCol,
           type: TileType.item,
           baseImagePath: targetTile.baseImagePath,
           itemImagePath: nextItemPath,
-          overlayNumber: 0, // No numbers for emoji merges
-        );
-        final newSourceData = TileData(
-          row: sourceRow,
-          col: sourceCol,
-          type: TileType.empty,
-          baseImagePath: defaultEmptyBase,
-        );
-
-        final newGrid =
-            currentGrid.map((row) => List<TileData>.from(row)).toList();
-        newGrid[targetRow][targetCol] = newTargetData;
-        newGrid[sourceRow][sourceCol] = newSourceData;
-        state = newGrid;
-
-        // --- Add XP for Plant Merge ---
-        final xpGained =
-            (currentIndex + 1) *
-            5; // Example: 5 XP for 🌱->🌿, 10 for 🌿->🌳 etc.
-        ref.read(playerStatsProvider.notifier).addXp(xpGained);
-        print("Gained $xpGained XP for merging into $nextItemPath");
-        return; // Merge handled, exit function
-      } else {
-        print("Already at max plant level: ${targetTile.itemImagePath}");
-        // Optional: Add feedback if trying to merge max level items
-        return;
-      }
-    }
-    // --- NEW Tool Merge Logic ---
-    else if (targetTile.itemImagePath != null &&
-        targetTile.itemImagePath == sourceTile.itemImagePath &&
-        toolSequence.contains(targetTile.itemImagePath)) {
-      final currentIndex = toolSequence.indexOf(targetTile.itemImagePath!);
-      if (currentIndex < toolSequence.length - 1) {
-        // Check if there's a next level
-        final nextItemPath = toolSequence[currentIndex + 1];
-        final newTargetData = TileData(
-          row: targetRow,
-          col: targetCol,
-          type: TileType.item,
-          baseImagePath: targetTile.baseImagePath,
-          itemImagePath: nextItemPath,
-          overlayNumber: 0,
-        );
-        final newSourceData = TileData(
-          row: sourceRow,
-          col: sourceCol,
-          type: TileType.empty,
-          baseImagePath: defaultEmptyBase,
-        );
-
-        final newGrid =
-            currentGrid.map((row) => List<TileData>.from(row)).toList();
-        newGrid[targetRow][targetCol] = newTargetData;
-        newGrid[sourceRow][sourceCol] = newSourceData;
-        state = newGrid;
-
-        // --- Add XP for Tool Merge ---
-        final xpGained =
-            (currentIndex + 1) * 6; // Example: 6 XP, 12 XP, 18 XP etc.
-        ref.read(playerStatsProvider.notifier).addXp(xpGained);
-        print("Gained $xpGained XP for merging into $nextItemPath");
-        return; // Merge handled, exit function
-      } else {
-        print("Already at max tool level: ${targetTile.itemImagePath}");
-        return;
-      }
-    }
-    // --- Existing Item Merge Logic (Shell, Sword) ---
-    else if (targetTile.itemImagePath != null && // Target must have an item
-        targetTile.itemImagePath ==
-            sourceTile.itemImagePath) // Items must match
-    {
-      String? mergedItemPath; // The result of the merge
-      int xpGained = 0;
-
-      // Rule: Shell + Shell -> Star
-      if (targetTile.itemImagePath == '🐚') {
-        mergedItemPath = '⭐';
-        xpGained = 15; // XP for creating a Star
-      }
-      // Rule: Sword + Sword -> Shield
-      else if (targetTile.itemImagePath == '⚔️') {
-        mergedItemPath = '🛡️'; // Shield emoji
-        xpGained = 25; // XP for creating a Shield
-      }
-      // Add more specific item merge rules here if needed
-
-      // If a merge rule was found:
-      if (mergedItemPath != null) {
-        final newTargetData = TileData(
-          row: targetRow,
-          col: targetCol,
-          type: TileType.item,
-          baseImagePath: targetTile.baseImagePath,
-          itemImagePath: mergedItemPath,
           overlayNumber: 0, // Merged items don't have numbers
         );
         final newSourceData = TileData(
@@ -409,16 +287,85 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         newGrid[sourceRow][sourceCol] = newSourceData;
         state = newGrid;
 
+        // --- Add XP for Merge ---
+        // Find the original sequence and index to calculate XP
+        int xpGained = 0;
+        int originalIndex = -1;
+        for (final sequence in mergeTrees.values) {
+          originalIndex = sequence.indexOf(targetTile.itemImagePath!);
+          if (originalIndex != -1) {
+            // Found the sequence, calculate XP based on the *original* item's level (index + 1)
+            // Using a simple formula for now, can be customized per sequence later
+            xpGained = (originalIndex + 1) * 5; // Example: 5, 10, 15 XP...
+            break;
+          }
+        }
+
         if (xpGained > 0) {
           ref.read(playerStatsProvider.notifier).addXp(xpGained);
-          print("Gained $xpGained XP for merging into $mergedItemPath");
+          print("Gained $xpGained XP for merging into $nextItemPath");
+        } else {
+          print(
+            "Merged $nextItemPath, but couldn't determine XP gain (sequence not found?).",
+          );
         }
-        return; // Merge handled
+
+        return; // Merge handled, exit function
+      }
+      // --- Handle Specific Non-Sequence Merges (e.g., Shell, Sword) ---
+      // These items might not be in mergeTrees or might have unique merge results
+      else {
+        String? specificMergedItemPath;
+        int xpGained = 0;
+
+        // Rule: Shell + Shell -> Star (Assuming '⭐' is not the next item in a sequence for '🐚')
+        if (targetTile.itemImagePath == '🐚') {
+          specificMergedItemPath = '⭐';
+          xpGained = 15;
+        }
+        // Rule: Sword + Sword -> Shield (Assuming '🛡️' is not the next item for '⚔️')
+        else if (targetTile.itemImagePath == '⚔️') {
+          specificMergedItemPath = '🛡️';
+          xpGained = 25;
+        }
+        // Add other specific merge rules here
+
+        if (specificMergedItemPath != null) {
+          final newTargetData = TileData(
+            row: targetRow,
+            col: targetCol,
+            type: TileType.item,
+            baseImagePath: targetTile.baseImagePath,
+            itemImagePath: specificMergedItemPath,
+            overlayNumber: 0,
+          );
+          final newSourceData = TileData(
+            row: sourceRow,
+            col: sourceCol,
+            type: TileType.empty,
+            baseImagePath: defaultEmptyBase,
+          );
+
+          final newGrid =
+              currentGrid.map((row) => List<TileData>.from(row)).toList();
+          newGrid[targetRow][targetCol] = newTargetData;
+          newGrid[sourceRow][sourceCol] = newSourceData;
+          state = newGrid;
+
+          if (xpGained > 0) {
+            ref.read(playerStatsProvider.notifier).addXp(xpGained);
+            print(
+              "Gained $xpGained XP for merging into $specificMergedItemPath",
+            );
+          }
+          return; // Specific merge handled
+        }
       }
     }
-    // If no merge condition was met
+
+    // If no merge condition was met (either not same item, or max level, or not a specific merge)
     print(
-      "Merge condition not met for ${sourceTile.itemImagePath ?? sourceTile.overlayNumber} onto ${targetTile.itemImagePath ?? targetTile.overlayNumber}",
+      "Merge condition not met for ${sourceTile.itemImagePath ?? 'empty'} onto ${targetTile.itemImagePath ?? 'empty'}",
     );
   }
 
@@ -522,43 +469,54 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       return;
     }
 
-    TileData generatorData;
-    if (generatorEmoji == barracksEmoji) {
-      generatorData = TileData(
-        row: row,
-        col: col, // Add row/col
-        type: TileType.generator,
-        baseImagePath: generatorEmoji, // Use emoji as base image
-        generatesItemPath: plantSequence[0], // Generate base plant 🌱
-        cooldownSeconds: barracksCooldown,
-        energyCost: barracksEnergyCost,
-      );
-    } else if (generatorEmoji == mineEmoji) {
-      generatorData = TileData(
-        row: row,
-        col: col, // Add row/col
-        type: TileType.generator,
-        baseImagePath: generatorEmoji,
-        generatesItemPath: coinEmoji,
-        cooldownSeconds: mineCooldown,
-        energyCost: mineEnergyCost,
-      );
-    } else if (generatorEmoji == workshopEmoji) {
-      generatorData = TileData(
-        row: row,
-        col: col,
-        type: TileType.generator,
-        baseImagePath: generatorEmoji,
-        generatesItemPath: toolSequence[0], // Generate base tool 🔧
-        cooldownSeconds: workshopCooldown,
-        energyCost: workshopEnergyCost,
-      );
-    } else {
-      print("Unknown generator type: $generatorEmoji");
-      return; // Don't place anything if unknown
+    // --- Refactored Generator Placement using Config ---
+    final config = generatorConfigs[generatorEmoji];
+    if (config == null) {
+      // Special case: Handle Mine if it generates coins directly (not via sequence)
+      if (generatorEmoji == mineEmoji) {
+        final mineData = TileData(
+          row: row,
+          col: col,
+          type: TileType.generator,
+          baseImagePath: generatorEmoji,
+          generatesItemPath: coinEmoji, // Directly generates coins
+          cooldownSeconds: 30, // Example cooldown for mine
+          energyCost: 1, // Example energy cost for mine
+        );
+        updateTile(row, col, mineData);
+        print("Placed Coin Mine generator at ($row, $col).");
+        return;
+      } else {
+        print("Unknown generator type or missing config: $generatorEmoji");
+        return; // Don't place anything if unknown or no config
+      }
     }
 
+    // Find the base item for the sequence
+    final sequence = mergeTrees[config.sequenceId];
+    if (sequence == null || sequence.isEmpty) {
+      print(
+        "Generator config found for $generatorEmoji, but its sequence '${config.sequenceId}' is missing or empty in mergeTrees.",
+      );
+      return;
+    }
+    final baseItemEmoji = sequence.first; // The item the generator produces
+
+    // Create the generator TileData using the config
+    final generatorData = TileData(
+      row: row,
+      col: col,
+      type: TileType.generator,
+      baseImagePath: generatorEmoji, // The generator's own appearance
+      generatesItemPath: baseItemEmoji, // The base item it generates
+      cooldownSeconds: config.cooldown,
+      energyCost: config.energyCost,
+    );
+
     updateTile(row, col, generatorData);
+    print(
+      "Placed $generatorEmoji generator at ($row, $col), generates $baseItemEmoji.",
+    );
   }
 
   // --- Generator Activation Logic ---
