@@ -57,20 +57,25 @@ Overhauling the UI, adding a Map Screen, and refining the Game Grid Screen based
     *   Replaced the order display (`_buildOrderDisplay`) with a new layout showing only the first order, using placeholder emojis (`🧑`).
     *   Replaced the bottom info bar placeholder (`_buildBottomInfoBarPlaceholder`) with a new layout (`_buildBottomInfoBar`) using placeholder emojis (`ℹ️`).
     *   Added subtle drop shadows to item tiles in `_buildTile`.
-    *   Added a placeholder star background concept (`⭐`) behind item tiles in `_buildTile`.
+    *   Removed the placeholder star background concept (`⭐`) from behind item tiles in `_buildTile`.
+    *   Adjusted the visual tile size in the `_buildTile` method (reduced SizedBox dimensions).
+    *   Modified the `Draggable` feedback and childWhenDragging to only show the item being dragged, leaving the base tile static.
+*   **Grid Dimensions:**
+    *   Changed grid size constants (`rowCount`, `colCount`) in `lib/providers/grid_provider.dart` from 11x6 to 9x7.
 
 ## Next Steps
 
-*   **Map Screen Implementation:** Replace the placeholder in `MapScreen` with actual map graphics and interactive elements.
+*   **Map Screen Implementation:** Replace the placeholder in `MapScreen` with actual map graphics, navigation, and potentially zone previews/interactions. Update its Top HUD.
 *   **Grid UI Refinement:**
     *   Replace placeholder emojis/icons in the Top HUD, Order Display, and Bottom Info Bar with actual assets or final icons.
     *   Implement dynamic text updates for the Bottom Info Bar based on selected tile.
-    *   Implement the energy cooldown display in the Top HUD.
-    *   Refine the "star tile" background implementation for items.
-    *   Further adjust grid tile sizing and layout for optimal appearance.
-*   **Refactor Shared UI:** Extract the duplicated status bar code (`_buildTopArea`, `_buildTopResource`) from `GameGridScreen` and `MapScreen` into a reusable widget.
-*   **Content Expansion:** Continue adding more items, generators (e.g., place Workshop generator in initial grid), orders, and zones.
-*   **Balancing:** Fine-tune XP, costs, rewards, and unlock requirements for both merge sequences.
+    *   Implement energy cooldown display in the Top HUD.
+    *   Further adjust grid layout for the new 9x7 dimensions if needed.
+*   **Refactor Shared UI:** Extract the new Top HUD code (`_buildTopArea`, `_buildTopResource`) into a shared widget used by both `GameGridScreen` and `MapScreen`.
+*   **Content Expansion:**
+    *   Add the new Workshop generator (`🏭`) to the initial grid setup or make it unlockable.
+    *   Add more merge chains, generators, orders (using new items), and unlockable zones/map areas, considering the new 9x7 grid size.
+*   **Balancing:** Fine-tune XP, costs, rewards, and unlock requirements for both merge sequences, considering the new 9x7 grid size.
 *   **Testing:** Implement automated tests.
 
 ## Active Decisions and Considerations

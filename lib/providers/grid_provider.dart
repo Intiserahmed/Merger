@@ -47,8 +47,8 @@ const int mineEnergyCost = 2;
 const int workshopEnergyCost = 3;
 
 // Constants moved from expansion_provider to be central here
-const int rowCount = 11; // Keep existing grid size for now
-const int colCount = 6;
+const int rowCount = 9; // New: 9 rows
+const int colCount = 7; // New: 7 columns
 
 class GridNotifier extends StateNotifier<List<List<TileData>>> {
   final Ref ref; // Add ref to access other providers

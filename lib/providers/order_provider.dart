@@ -33,9 +33,9 @@ final List<Order> _possibleOrders = [
   ),
   Order(
     id: 'order_sword_5', // Example: Order for base items
-    requiredItemId: '⚔️',
-    requiredCount: 5,
-    rewardCoins: 30,
+    requiredItemId: '🌳',
+    requiredCount: 2,
+    rewardCoins: 400,
     rewardXp: 5,
   ),
   // Add more diverse orders

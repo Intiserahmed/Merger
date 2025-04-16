@@ -160,14 +160,7 @@ class GameGridScreen extends ConsumerWidget {
                   fit: BoxFit.contain,
                   size: 30,
                 ),
-              // --- Item Background (Star concept for items) ---
-              if (tileData.isItem)
-                const Center(
-                  child: Text(
-                    '⭐', // Placeholder for star tile background
-                    style: TextStyle(fontSize: 40, color: Colors.black12),
-                  ),
-                ),
+              // --- Item Background (Star concept for items) --- REMOVED
               // --- Item Layer (Conditional) ---
               if (tileData.itemImagePath != null)
                 _buildTileContent(
@@ -201,8 +194,8 @@ class GameGridScreen extends ConsumerWidget {
 
         // Wrap content in SizedBox for consistent sizing
         content = SizedBox(
-          width: 55, // Adjust size as needed
-          height: 55,
+          width: 50, // New smaller size
+          height: 50, // New smaller size
           child: content,
         );
 
@@ -211,30 +204,54 @@ class GameGridScreen extends ConsumerWidget {
         if (isDraggable) {
           return Draggable<TileDropData>(
             data: TileDropData(row: row, col: col, tileData: tileData),
+            // Feedback: Only the item image/emoji
             feedback: Material(
               color: Colors.transparent,
               child: SizedBox(
-                width: 60, // Feedback slightly larger
-                height: 60,
-                child: Opacity(opacity: 0.75, child: content),
-              ),
-            ),
-            childWhenDragging: SizedBox(
-              width: 55,
-              height: 55,
-              child: Container(
-                margin: const EdgeInsets.all(1.0),
-                decoration: BoxDecoration(
-                  color: backgroundColor.withOpacity(0.5), // Dimmed background
-                  border: Border.all(
-                    color: Colors.black.withOpacity(0.4),
-                    width: 1.0,
-                  ),
-                  borderRadius: BorderRadius.circular(4.0),
+                width: 45, // Slightly smaller feedback visual
+                height: 45,
+                child: _buildTileContent(
+                  tileData
+                      .itemImagePath!, // Assured to be non-null by isDraggable check
+                  size: 40, // Make dragged item slightly larger
                 ),
               ),
             ),
-            child: content,
+            // ChildWhenDragging: The original tile without the item
+            childWhenDragging: SizedBox(
+              width: 50, // Match new smaller size
+              height: 50, // Match new smaller size
+              child: Container(
+                // Rebuild the tile content *without* the item layer
+                key: ValueKey('dragging_${row}_${col}'), // Unique key
+                margin: const EdgeInsets.all(1.0),
+                decoration: BoxDecoration(
+                  color: backgroundColor, // Keep original background
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.2),
+                    width: 0.5,
+                  ),
+                  boxShadow: null, // No shadow when item is being dragged away
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  alignment: Alignment.center,
+                  children: [
+                    // Base Layer (Generator/Locked) - Should not be draggable anyway, but include for completeness
+                    if (tileData.isGenerator || tileData.isLocked)
+                      _buildTileContent(
+                        tileData.baseImagePath,
+                        fit: BoxFit.contain,
+                        size: 30,
+                      ),
+                    // Item Background (Star concept) - REMOVED
+                    // --- Item Layer is intentionally OMITTED here ---
+                  ],
+                ),
+              ),
+            ),
+            child: content, // The original full tile content
           );
         } else {
           // --- GestureDetector for Taps (Locked, Generators, Empty) ---
