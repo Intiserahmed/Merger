@@ -11,6 +11,7 @@ class PlayerStats {
   int level;
   int xp;
   int coins;
+  int gems; // Add gems field
   int energy;
   int maxEnergy; // Maximum energy capacity
   List<String> unlockedZoneIds; // Store IDs of unlocked zones
@@ -19,7 +20,8 @@ class PlayerStats {
   PlayerStats({
     this.level = 1,
     this.xp = 0,
-    this.coins = 50, // Starting values
+    this.coins = 50,
+    this.gems = 20, // Starting gems value
     this.energy = 100,
     this.maxEnergy = 100, // Default max energy
     List<String>? initialUnlockedZoneIds, // Make it optional

@@ -12,10 +12,20 @@ import 'expansion_provider.dart'; // Import expansion provider
 // --- Generator Definitions ---
 const String barracksEmoji = '🏕️';
 const String mineEmoji = '⛏️';
-const String swordEmoji = '⚔️';
+const String swordEmoji = '⚔️'; // Keep for potential other uses/orders
 const String coinEmoji = '💰';
 const String lockedEmoji = '🔒'; // Emoji for locked tiles
 const String defaultEmptyBase = '🟫'; // Default base for empty/unlocked tiles
+
+// --- Plant Merge Sequence ---
+const List<String> plantSequence = [
+  '🌱',
+  '🌿',
+  '🌳',
+  '🌲',
+  '🌴',
+  '🌵',
+]; // Seedling -> Herb -> Tree -> Evergreen -> Palm -> Cactus
 
 const int barracksCooldown = 15; // seconds
 const int mineCooldown = 30; // seconds
@@ -23,7 +33,7 @@ const int barracksEnergyCost = 5;
 const int mineEnergyCost = 2;
 
 // Constants moved from expansion_provider to be central here
-const int rowCount = 11;
+const int rowCount = 11; // Keep existing grid size for now
 const int colCount = 6;
 
 class GridNotifier extends StateNotifier<List<List<TileData>>> {
@@ -78,96 +88,10 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         }
 
         // --- Existing Map layout ---
-        // (Keep the existing layout logic for unlocked tiles)
+        // (Keep the existing layout logic for unlocked tiles, but remove numbered items)
         // Add row/col to all TileData instantiations
-        if (row == 0 && col == 4)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 11,
-          );
-        if (row == 0 && col == 5)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 11,
-          );
-        if (row == 1 && col == 3)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.empty,
-            baseImagePath: grass,
-          ); // Grass tile
-        if (row == 1 && col == 4)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 10,
-          );
-        if (row == 1 && col == 5)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 10,
-          );
-        if (row == 1 && col == 2)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 9,
-          );
 
-        if (row == 2 && col == 0)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 8,
-          );
-        if (row == 2 && col == 1)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 8,
-          );
-        if (row == 2 && col == 3)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.empty,
-            baseImagePath: grass,
-          ); // Grass tile
-
-        if (row == 3 && col == 0)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 8,
-          );
-        if (row == 3 && col == 1)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 7,
-          );
+        // Example: Keep some specific items if needed
         if (row == 3 && col == 2)
           return TileData(
             row: row,
@@ -176,31 +100,6 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             baseImagePath: sand,
             itemImagePath: photo,
           ); // Photo item
-        if (row == 3 && col == 5)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 6,
-          );
-        if (row == 3 && col == 4)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 6,
-          );
-
-        if (row == 4 && col == 0)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 8,
-          );
         if (row == 4 && col == 1)
           return TileData(
             row: row,
@@ -233,23 +132,6 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
-        if (row == 4 && col == 5)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 6,
-          );
-
-        if (row == 5 && col == 0)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 8,
-          );
         if (row == 5 && col == 1)
           return TileData(
             row: row,
@@ -266,15 +148,6 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             baseImagePath: sand,
             itemImagePath: shell,
           ); // Shell item
-
-        if (row == 6 && col == 0)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            overlayNumber: 8,
-          );
         if (row == 6 && col == 1)
           return TileData(
             row: row,
@@ -291,7 +164,6 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
-
         if (row == 7 && col == 0)
           return TileData(
             row: row,
@@ -301,15 +173,18 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             itemImagePath: photo,
           ); // Photo item
 
-        if (row < 2 && col < 4)
+        // Define grassy areas
+        if ((row == 1 && col == 3) ||
+            (row == 2 && col == 3) ||
+            (row < 2 && col < 4))
           return TileData(
             row: row,
             col: col,
             type: TileType.empty,
             baseImagePath: grass,
-          ); // Top left grassy area
+          ); // Grass tile
 
-        // Default: Plain empty tile
+        // Default: Plain empty tile (sand/brown)
         return TileData(
           row: row,
           col: col,
@@ -395,102 +270,102 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       return;
     }
 
-    // Example merge rule: Only merge identical overlay numbers > 0
-    if (targetTile.overlayNumber > 0 &&
-        targetTile.overlayNumber == sourceTile.overlayNumber) {
-      // Create the new data for the target and source tiles
-      final mergedValue = targetTile.overlayNumber + 1; // Or your merge logic
-      final newTargetData = TileData(
-        row: targetRow,
-        col: targetCol, // Add row/col
-        baseImagePath: targetTile.baseImagePath, // Keep base
-        overlayNumber: mergedValue,
-      );
+    // --- NEW Plant Merge Logic ---
+    if (targetTile.itemImagePath != null &&
+        targetTile.itemImagePath == sourceTile.itemImagePath &&
+        plantSequence.contains(targetTile.itemImagePath)) {
+      final currentIndex = plantSequence.indexOf(targetTile.itemImagePath!);
+      if (currentIndex < plantSequence.length - 1) {
+        // Check if there's a next level
+        final nextItemPath = plantSequence[currentIndex + 1];
+        final newTargetData = TileData(
+          row: targetRow,
+          col: targetCol,
+          type: TileType.item,
+          baseImagePath: targetTile.baseImagePath,
+          itemImagePath: nextItemPath,
+          overlayNumber: 0, // No numbers for emoji merges
+        );
+        final newSourceData = TileData(
+          row: sourceRow,
+          col: sourceCol,
+          type: TileType.empty,
+          baseImagePath: defaultEmptyBase,
+        );
 
-      // Clear the source tile (replace with default empty tile)
-      final newSourceData = TileData(
-        row: sourceRow,
-        col: sourceCol, // Add row/col
-        baseImagePath: defaultEmptyBase,
-      ); // Empty tile
+        final newGrid =
+            currentGrid.map((row) => List<TileData>.from(row)).toList();
+        newGrid[targetRow][targetCol] = newTargetData;
+        newGrid[sourceRow][sourceCol] = newSourceData;
+        state = newGrid;
 
-      // --- Create a NEW grid state (Immutability!) ---
-      final newGrid =
-          currentGrid.map((row) => List<TileData>.from(row)).toList();
-
-      // Update the new grid
-      newGrid[targetRow][targetCol] = newTargetData;
-      newGrid[sourceRow][sourceCol] = newSourceData;
-
-      // Assign the new grid to the state
-      state = newGrid;
-
-      // --- Add XP for Number Merge ---
-      const int numberMergeXpThreshold = 5; // Grant XP for merging numbers >= 5
-      if (mergedValue >= numberMergeXpThreshold) {
-        final xpGained = mergedValue * 2; // Example XP formula
+        // --- Add XP for Plant Merge ---
+        final xpGained =
+            (currentIndex + 1) *
+            5; // Example: 5 XP for 🌱->🌿, 10 for 🌿->🌳 etc.
         ref.read(playerStatsProvider.notifier).addXp(xpGained);
-        print("Gained $xpGained XP for merging number $mergedValue");
+        print("Gained $xpGained XP for merging into $nextItemPath");
+        return; // Merge handled, exit function
+      } else {
+        print("Already at max plant level: ${targetTile.itemImagePath}");
+        // Optional: Add feedback if trying to merge max level items
+        return;
       }
     }
-    // --- Add Item Merge Logic ---
+    // --- Existing Item Merge Logic (Shell, Sword) ---
     else if (targetTile.itemImagePath != null && // Target must have an item
         targetTile.itemImagePath ==
             sourceTile.itemImagePath) // Items must match
     {
       String? mergedItemPath; // The result of the merge
+      int xpGained = 0;
 
       // Rule: Shell + Shell -> Star
       if (targetTile.itemImagePath == '🐚') {
         mergedItemPath = '⭐';
+        xpGained = 15; // XP for creating a Star
       }
       // Rule: Sword + Sword -> Shield
       else if (targetTile.itemImagePath == '⚔️') {
         mergedItemPath = '🛡️'; // Shield emoji
+        xpGained = 25; // XP for creating a Shield
       }
+      // Add more specific item merge rules here if needed
 
       // If a merge rule was found:
       if (mergedItemPath != null) {
-        // Create new data for target and source
         final newTargetData = TileData(
           row: targetRow,
-          col: targetCol, // Add row/col
-          baseImagePath: targetTile.baseImagePath, // Keep base
-          itemImagePath: mergedItemPath, // Set the new merged item
-          overlayNumber: 0, // Merged items usually don't have numbers
+          col: targetCol,
+          type: TileType.item,
+          baseImagePath: targetTile.baseImagePath,
+          itemImagePath: mergedItemPath,
+          overlayNumber: 0, // Merged items don't have numbers
         );
-
         final newSourceData = TileData(
           row: sourceRow,
-          col: sourceCol, // Add row/col
+          col: sourceCol,
+          type: TileType.empty,
           baseImagePath: defaultEmptyBase,
-        ); // Clear source
+        );
 
-        // Create a NEW grid state
         final newGrid =
             currentGrid.map((row) => List<TileData>.from(row)).toList();
-
-        // Update the new grid
         newGrid[targetRow][targetCol] = newTargetData;
         newGrid[sourceRow][sourceCol] = newSourceData;
-
-        // Assign the new grid to the state
         state = newGrid;
 
-        // --- Add XP for Item Merge ---
-        int xpGained = 0;
-        if (mergedItemPath == '⭐') {
-          xpGained = 15; // XP for creating a Star
-        } else if (mergedItemPath == '🛡️') {
-          xpGained = 25; // XP for creating a Shield
-        }
         if (xpGained > 0) {
           ref.read(playerStatsProvider.notifier).addXp(xpGained);
           print("Gained $xpGained XP for merging into $mergedItemPath");
         }
+        return; // Merge handled
       }
     }
-    // Add more item merge rules with 'else if' blocks as needed
+    // If no merge condition was met
+    print(
+      "Merge condition not met for ${sourceTile.itemImagePath ?? sourceTile.overlayNumber} onto ${targetTile.itemImagePath ?? targetTile.overlayNumber}",
+    );
   }
 
   /// Updates a single tile's data. Use this for placing items, generators, etc.
@@ -600,7 +475,7 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         col: col, // Add row/col
         type: TileType.generator,
         baseImagePath: generatorEmoji, // Use emoji as base image
-        generatesItemPath: swordEmoji,
+        generatesItemPath: plantSequence[0], // Generate base plant 🌱
         cooldownSeconds: barracksCooldown,
         energyCost: barracksEnergyCost,
       );

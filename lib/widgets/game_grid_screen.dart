@@ -8,9 +8,16 @@ import 'package:merger/providers/expansion_provider.dart'; // Import expansion p
 import 'package:merger/main.dart'; // Import main to access global isar instance
 import 'package:merger/persistence/game_service.dart'; // Import GameService
 
+import 'dart:math' as math; // For Point class if needed elsewhere
 import '../models/tile_data.dart';
 import '../providers/grid_provider.dart' as grid; // Use prefix
-import '../providers/player_provider.dart'; // Example for showing coins
+import '../providers/player_provider.dart';
+import '../providers/navigation_provider.dart'; // Import navigation provider
+
+// Define colors for the chessboard pattern
+final Color lightBrown = Colors.brown[300]!;
+final Color darkBrown = Colors.brown[600]!;
+final Color grassGreen = Colors.green[400]!; // For grass base tiles
 
 class GameGridScreen extends ConsumerWidget {
   const GameGridScreen({super.key});
@@ -19,7 +26,7 @@ class GameGridScreen extends ConsumerWidget {
   Widget _buildTileContent(
     String pathOrEmoji, {
     BoxFit fit = BoxFit.contain,
-    double size = 28,
+    double size = 28, // Default size, can be overridden
   }) {
     // Simple check: if it contains '/', assume it's a path
     if (pathOrEmoji.contains('/')) {
@@ -60,165 +67,178 @@ class GameGridScreen extends ConsumerWidget {
     }
     final TileData tileData = gridData[row][col];
 
-    // --- Drag Target Logic (Remains the same) ---
+    // Determine background color based on chessboard pattern and base image
+    Color backgroundColor;
+    if (tileData.baseImagePath == '🟩') {
+      // Grass tiles are always green
+      backgroundColor = grassGreen;
+    } else if (tileData.isLocked) {
+      backgroundColor = Colors.grey.shade500; // Locked tiles are grey
+    } else {
+      // Chessboard pattern for non-grass, unlocked tiles
+      backgroundColor = (row + col) % 2 == 0 ? lightBrown : darkBrown;
+    }
+
+    // --- Drag Target Logic ---
     return DragTarget<TileDropData>(
       onWillAccept: (dragData) {
         if (dragData == null || (dragData.row == row && dragData.col == col)) {
           return false;
         }
-        final targetTile = tileData; // Use data already watched
+        final targetTile = tileData;
         final sourceTile = dragData.tileData;
-        // --- Merge Logic ---
-        // Rule 1: Merge identical overlay numbers > 0
-        if (targetTile.overlayNumber > 0 &&
-            targetTile.overlayNumber == sourceTile.overlayNumber) {
-          return true;
+
+        // Prevent dropping onto locked tiles
+        if (targetTile.isLocked) return false;
+
+        // --- NEW Merge Logic Check (based on provider logic) ---
+        // Check if items are identical and part of the plant sequence
+        if (targetTile.itemImagePath != null &&
+            targetTile.itemImagePath == sourceTile.itemImagePath &&
+            grid.plantSequence.contains(targetTile.itemImagePath)) {
+          // Check if it's not the max level
+          final currentIndex = grid.plantSequence.indexOf(
+            targetTile.itemImagePath!,
+          );
+          return currentIndex < grid.plantSequence.length - 1;
         }
-        // Rule 2: Merge specific identical items (emojis)
-        else if (targetTile.itemImagePath !=
-                null && // Ensure target has an item
-            targetTile.itemImagePath ==
-                sourceTile.itemImagePath && // Items must match
+        // Check for other specific item merges (e.g., Shell, Sword)
+        else if (targetTile.itemImagePath != null &&
+            targetTile.itemImagePath == sourceTile.itemImagePath &&
             (targetTile.itemImagePath == '🐚' ||
-                targetTile.itemImagePath ==
-                    '⚔️')) // Only allow shell or sword merges for now
-        {
+                targetTile.itemImagePath == '⚔️')) {
+          // Add specific checks if needed (e.g., prevent merging sword into shield if shield exists)
           return true;
         }
-        // Otherwise, don't allow the drop
-        return false;
+        // Allow dropping onto an empty tile (if needed for placement logic later)
+        // else if (targetTile.isEmpty) {
+        //   return true; // Or add specific placement rules
+        // }
+
+        return false; // Default: don't accept drop
       },
       onAccept: (dragData) {
+        // Only call merge if it's a valid merge target based on onWillAccept logic
+        // (We assume onWillAccept correctly filtered)
         ref
             .read(grid.gridProvider.notifier) // Use prefix
             .mergeTiles(row, col, dragData.row, dragData.col);
       },
       builder: (context, candidateData, rejectedData) {
-        Widget content;
-
-        // --- Visual Representation ---
-        if (tileData.overlayNumber > 0) {
-          // --- Number Overlay ---
-          content = Container(
-            key: ValueKey('overlay_${row}_${col}_${tileData.overlayNumber}'),
-            margin: const EdgeInsets.all(1.0),
-            decoration: BoxDecoration(
-              // Light background for number overlay (can be themed)
-              color: Colors.grey.shade300.withOpacity(0.8),
-              // Use emoji as subtle background texture?
-              // Faded base emoji behind number:
-              // image: DecorationImage(
-              //   image: TextAsImage(tileData.baseImagePath), // Hypothetical TextAsImage
-              //   opacity: 0.1
-              // ),
-              border: Border.all(color: Colors.black54, width: 0.5),
-              borderRadius: BorderRadius.circular(4.0),
+        // --- Visual Representation (No more number overlay) ---
+        Widget content = Container(
+          key: ValueKey(
+            'tile_${row}_${col}_${tileData.type}_${tileData.itemImagePath ?? 'base'}',
+          ),
+          margin: const EdgeInsets.all(1.0), // Small margin between tiles
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            border: Border.all(
+              color: Colors.black.withOpacity(0.2),
+              width: 0.5,
             ),
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                transitionBuilder:
-                    (child, animation) =>
-                        ScaleTransition(scale: animation, child: child),
-                child: Text(
-                  '${tileData.overlayNumber}',
-                  key: ValueKey<int>(tileData.overlayNumber),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: Colors.black87, // Darker text on light background
-                    shadows: [
-                      Shadow(
-                        blurRadius: 1.0,
-                        color: Colors.white,
-                        offset: Offset(0.5, 0.5),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        } else {
-          // --- Base Tile + Item (Using Emojis/Images) ---
-          content = Container(
-            key: ValueKey(
-              'item_${row}_${col}_${tileData.itemImagePath ?? 'empty'}',
-            ),
-            margin: const EdgeInsets.all(1.0),
-            decoration: BoxDecoration(
-              // Optional: Add a subtle border to empty tiles too
-              border: Border.all(color: Colors.grey.shade400, width: 0.5),
-              borderRadius: BorderRadius.circular(4.0),
-              // Optional: slight background color if base image is transparent emoji
-              // color: Colors.brown.shade100.withOpacity(0.3),
-            ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // --- Base Layer ---
-                // Use helper, provide appropriate fit and size
+            borderRadius: BorderRadius.circular(4.0),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            alignment: Alignment.center,
+            children: [
+              // --- Base Layer (Only show if different from background, e.g., generator) ---
+              if (tileData.isGenerator || tileData.isLocked)
                 _buildTileContent(
                   tileData.baseImagePath,
-                  fit: BoxFit.fill,
+                  fit: BoxFit.contain, // Generators might not fill
                   size: 30,
-                ), // Base fills more
-                // --- Item Layer (Conditional) ---
-                if (tileData.itemImagePath != null)
-                  // Use helper, maybe slightly smaller size for item
-                  _buildTileContent(
-                    tileData.itemImagePath!,
-                    fit: BoxFit.contain,
-                    size: 26,
+                ),
+              // --- Item Layer (Conditional) ---
+              if (tileData.itemImagePath != null)
+                _buildTileContent(
+                  tileData.itemImagePath!,
+                  fit: BoxFit.contain,
+                  size: 28, // Slightly smaller for item
+                ),
+              // --- Cooldown Overlay for Generators ---
+              if (tileData.isGenerator && !tileData.isReady)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${tileData.remainingCooldown.inSeconds}s',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-              ],
-            ),
-          );
-        }
+                ),
+            ],
+          ),
+        );
 
-        // --- Draggable Logic (Remains the same) ---
-        bool isDraggable =
-            tileData.overlayNumber > 0 || tileData.itemImagePath != null;
+        // Wrap content in SizedBox for consistent sizing
+        content = SizedBox(
+          width: 55, // Adjust size as needed
+          height: 55,
+          child: content,
+        );
+
+        // --- Draggable Logic ---
+        bool isDraggable = tileData.isItem; // Only items are draggable now
         if (isDraggable) {
           return Draggable<TileDropData>(
             data: TileDropData(row: row, col: col, tileData: tileData),
             feedback: Material(
               color: Colors.transparent,
               child: SizedBox(
-                width: 60,
+                width: 60, // Feedback slightly larger
                 height: 60,
-                // Apply styling to feedback if needed (e.g., different background)
-                child: Opacity(opacity: 0.7, child: content),
+                child: Opacity(opacity: 0.75, child: content),
               ),
             ),
-            childWhenDragging: Container(
-              margin: const EdgeInsets.all(1.0),
-              decoration: BoxDecoration(
-                color: Colors.blueGrey.withOpacity(0.3),
-                border: Border.all(color: Colors.brown.shade300, width: 0.5),
-                borderRadius: BorderRadius.circular(4.0),
+            childWhenDragging: SizedBox(
+              width: 55,
+              height: 55,
+              child: Container(
+                margin: const EdgeInsets.all(1.0),
+                decoration: BoxDecoration(
+                  color: backgroundColor.withOpacity(0.5), // Dimmed background
+                  border: Border.all(
+                    color: Colors.black.withOpacity(0.4),
+                    width: 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
               ),
-              // Optional: show base emoji faintly in empty spot
-              // child: Center(child: Text(tileData.baseImagePath, style: TextStyle(fontSize: 20, color: Colors.black.withOpacity(0.2)))),
             ),
             child: content,
           );
         } else {
+          // --- GestureDetector for Taps (Locked, Generators, Empty) ---
           return GestureDetector(
             onTap: () {
               // --- Tap Logic for Non-Draggable Tiles ---
               if (tileData.isLocked) {
                 // --- Handle Tapping Locked Tile ---
                 final availableUnlocks = ref.read(availableUnlocksProvider);
-                final tappedPoint = Point(
-                  row,
-                  col,
-                ); // Point from tile_unlock.dart
+                // Use math.Point for consistency if TileUnlock uses it
+                final tappedPoint = math.Point(row, col);
                 TileUnlock? targetUnlock;
 
-                // Find which available unlock this tile belongs to
                 for (final unlock in availableUnlocks) {
-                  if (unlock.coveredTiles.contains(tappedPoint)) {
+                  // Ensure unlock.coveredTiles contains math.Point objects
+                  // dart:math Point uses x/y, TileUnlock Point uses row/col.
+                  // Assuming coveredTiles uses the TileUnlock Point definition.
+                  if (unlock.coveredTiles.any(
+                    (p) =>
+                        p.row == row &&
+                        p.col == col, // Compare with tile's row/col
+                  )) {
                     targetUnlock = unlock;
                     break;
                   }
@@ -230,7 +250,6 @@ class GameGridScreen extends ConsumerWidget {
                       .read(playerStatsProvider.notifier)
                       .unlockZone(targetUnlock);
 
-                  // Show feedback
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -243,22 +262,22 @@ class GameGridScreen extends ConsumerWidget {
                   );
                 } else {
                   // Tile is locked, but not part of an AVAILABLE unlock
-                  // (Could be level too low, or already unlocked but grid hasn't updated yet)
-                  // Find the zone it *does* belong to for info message
                   final allUnlocks = ref.read(allUnlocksProvider);
                   final actualZone = allUnlocks.firstWhere(
-                    (u) => u.coveredTiles.contains(tappedPoint),
+                    (u) => u.coveredTiles.any(
+                      (p) =>
+                          p.row == row &&
+                          p.col == col, // Compare with tile's row/col
+                    ),
                     orElse:
-                        () => TileUnlock(
-                          id: 'unknown_zone',
-                          requiredLevel: 999,
-                        ), // Default if somehow not found
+                        () =>
+                            TileUnlock(id: 'unknown_zone', requiredLevel: 999),
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
                         "Zone locked. Requires Level ${actualZone.requiredLevel}.",
-                      ), // Simple message
+                      ),
                       duration: const Duration(seconds: 1),
                     ),
                   );
@@ -267,7 +286,7 @@ class GameGridScreen extends ConsumerWidget {
                 // --- Handle Tapping Generator ---
                 ref
                     .read(grid.gridProvider.notifier)
-                    .activateGenerator(row, col); // Use prefix
+                    .activateGenerator(row, col);
               }
               // Add other tap actions for empty tiles if needed later
             },
@@ -278,112 +297,279 @@ class GameGridScreen extends ConsumerWidget {
     );
   }
 
-  // --- Main Build Method (Remains mostly the same) ---
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Merger Game (Emoji Placeholders)'),
-        actions: [
-          // Example: Show Coins
-          Consumer(
-            builder: (context, ref, child) {
-              final coins = ref.watch(coinsProvider);
-              return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: Center(child: Text('💰: $coins')), // Use coin emoji
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.build), // Or any other icon
-            tooltip: 'Place Barracks (Debug)',
-            onPressed: () {
-              ref
-                  .read(grid.gridProvider.notifier) // Use prefix
-                  .placeGenerator(1, 1, grid.barracksEmoji); // Use prefix
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.agriculture), // Or any other icon
-            tooltip: 'Place Mine (Debug)',
-            onPressed: () {
-              ref
-                  .read(grid.gridProvider.notifier) // Use prefix
-                  .placeGenerator(2, 2, grid.mineEmoji); // Use prefix
-            },
-          ),
-          // Add Save Button (Debug)
-          IconButton(
-            icon: const Icon(Icons.save),
-            tooltip: 'Save Game State (Debug)',
-            onPressed: () async {
-              // Access the GameService via the global Isar instance and the ref's container
-              // This is not ideal, but works for now. A better approach would use a dedicated provider for GameService.
-              final container = ProviderScope.containerOf(context);
-              await GameService(
-                isar,
-                container,
-              ).saveGame(); // Use global isar from main.dart
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Game state saved!"),
-                  duration: Duration(seconds: 1),
+  // --- Build Top Area (Level + Status Bars) ---
+  Widget _buildTopArea(BuildContext context, WidgetRef ref) {
+    // Watch the whole PlayerStats object
+    final playerStats = ref.watch(playerStatsProvider);
+    // Access individual stats from the object
+    final level = playerStats.level;
+    final energy = playerStats.energy;
+    final maxEnergy = playerStats.maxEnergy; // Get maxEnergy from PlayerStats
+    final coins = playerStats.coins;
+    final gems =
+        playerStats.gems; // Assuming gems is added to PlayerStats model
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12.0,
+        vertical: 8.0,
+      ).copyWith(top: MediaQuery.of(context).padding.top + 8.0), // Safe area
+      color: Colors.blue.shade700, // Example background color
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // --- Level Indicator ---
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade900,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.lightBlueAccent, width: 1.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star, color: Colors.yellowAccent, size: 20),
+                const SizedBox(width: 6),
+                Text(
+                  '$level',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
-              );
-            },
+              ],
+            ),
+          ),
+          // --- Resource Bars ---
+          Row(
+            children: [
+              _buildResourceBar('⚡', '$energy/$maxEnergy', Colors.yellow),
+              const SizedBox(width: 10),
+              _buildResourceBar('💰', '$coins', Colors.amber),
+              const SizedBox(width: 10),
+              _buildResourceBar('💎', '$gems', Colors.purpleAccent),
+            ],
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(4.0),
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          // Use prefixed constants
-          itemCount: grid.rowCount * grid.colCount,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: grid.colCount, // Use prefix
-            childAspectRatio: 1.0, // Keep aspect ratio 1 for square tiles
-          ),
-          itemBuilder: (context, index) => _buildTile(context, ref, index),
-        ),
+    );
+  }
+
+  // Helper for individual resource bars in the status bar
+  Widget _buildResourceBar(String icon, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withOpacity(0.8), width: 1),
       ),
-      // --- Order Display Area ---
-      bottomNavigationBar: _buildOrderDisplay(
-        context,
-        ref,
-      ), // Add order display
-      // --- Add Item Spawner Button ---
+      child: Row(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Build Bottom Info Bar Placeholder ---
+  Widget _buildBottomInfoBarPlaceholder() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      color: Colors.blueGrey.shade700,
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline, color: Colors.white70, size: 20),
+          SizedBox(width: 10),
+          Text(
+            "Placeholder: Merge items to reach next level.", // Placeholder text
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Main Build Method ---
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Get screen size for potential adjustments
+    // final screenSize = MediaQuery.of(context).size;
+
+    return Scaffold(
+      // Remove AppBar
+      // appBar: AppBar(...),
+      backgroundColor: Colors.blueGrey.shade900, // Darker background overall
+      body: Column(
+        // Use Column for layout
+        children: [
+          // --- Top Area (Status Bar + Level) ---
+          _buildTopArea(context, ref),
+
+          // --- Debug Buttons (Optional, keep for now) ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.build, color: Colors.white54),
+                tooltip: 'Place Barracks (Debug)',
+                onPressed: () {
+                  ref
+                      .read(grid.gridProvider.notifier)
+                      .placeGenerator(1, 1, grid.barracksEmoji);
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.agriculture, color: Colors.white54),
+                tooltip: 'Place Mine (Debug)',
+                onPressed: () {
+                  ref
+                      .read(grid.gridProvider.notifier)
+                      .placeGenerator(2, 2, grid.mineEmoji);
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.save, color: Colors.white54),
+                tooltip: 'Save Game State (Debug)',
+                onPressed: () async {
+                  final container = ProviderScope.containerOf(context);
+                  await GameService(isar, container).saveGame();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Game state saved!"),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          // --- Game Grid ---
+          Expanded(
+            // Grid takes remaining space
+            child: Padding(
+              padding: const EdgeInsets.all(8.0), // Padding around the grid
+              child: Center(
+                // Center the grid if it doesn't fill width
+                child: GridView.builder(
+                  shrinkWrap: true, // Important if grid is centered or smaller
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: grid.rowCount * grid.colCount,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: grid.colCount,
+                    childAspectRatio: 1.0, // Keep square tiles
+                    mainAxisSpacing: 2.0, // Spacing between rows
+                    crossAxisSpacing: 2.0, // Spacing between columns
+                  ),
+                  itemBuilder:
+                      (context, index) => _buildTile(context, ref, index),
+                ),
+              ),
+            ),
+          ),
+
+          // --- Order Display Area ---
+          _buildOrderDisplay(context, ref),
+
+          // --- Bottom Info Bar ---
+          _buildBottomInfoBarPlaceholder(),
+        ],
+      ),
+      // --- Floating Action Buttons ---
+      floatingActionButton: Row(
+        // Use a Row to place buttons side-by-side
+        mainAxisAlignment: MainAxisAlignment.end, // Align to the end
+        children: [
+          // --- Spawn Button ---
+          FloatingActionButton.extended(
+            heroTag: 'spawnFabGrid', // Unique heroTag for Grid screen spawn
+            onPressed: () {
+              final playerNotifier = ref.read(playerStatsProvider.notifier);
+              final gridNotifier = ref.read(grid.gridProvider.notifier);
+              final bool energySpent = playerNotifier.spendEnergy(
+                spawnEnergyCost,
+              );
+
+              if (energySpent) {
+                // Spawn the base plant item
+                final bool itemSpawned = gridNotifier.spawnItemOnFirstEmpty(
+                  grid.plantSequence[0],
+                );
+
+                if (!itemSpawned) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("No empty space to spawn an item!"),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                  // Optional refund
+                  // playerNotifier.addEnergy(spawnEnergyCost);
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Not enough energy to spawn an item!"),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
+            },
+            label: const Text('Spawn 🌱'), // Update label
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Costs $spawnEnergyCost energy',
+            backgroundColor: Colors.teal, // Example color
+          ),
+          const SizedBox(width: 10), // Spacing between FABs
+          // --- Navigation Button ---
+          FloatingActionButton(
+            heroTag: 'navFabGrid', // Unique heroTag for Grid screen nav
+            onPressed: () {
+              // Set the active screen index to 1 (MapScreen)
+              ref.read(activeScreenIndexProvider.notifier).state = 1;
+            },
+            tooltip: 'Go to Map',
+            backgroundColor: Colors.blueAccent,
+            child: const Icon(Icons.map),
+          ),
+        ],
+      ),
+      /* // Original FAB code:
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // Get notifiers
           final playerNotifier = ref.read(playerStatsProvider.notifier);
-          final gridNotifier = ref.read(
-            grid.gridProvider.notifier,
-          ); // Use prefix
-
-          // 1. Try to spend energy
+          final gridNotifier = ref.read(grid.gridProvider.notifier);
           final bool energySpent = playerNotifier.spendEnergy(spawnEnergyCost);
 
           if (energySpent) {
-            // 2. If energy spent, try to spawn an item (e.g., Shell)
+            // Spawn the base plant item
             final bool itemSpawned = gridNotifier.spawnItemOnFirstEmpty(
-              '🐚',
-            ); // Spawn a shell
+              grid.plantSequence[0],
+            );
 
             if (!itemSpawned) {
-              // Optional: Show feedback if no empty tile
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text("No empty space to spawn an item!"),
                   duration: Duration(seconds: 1),
                 ),
               );
-              // Consider refunding energy if spawn fails? Depends on game design.
-              // playerNotifier.addEnergy(spawnEnergyCost); // Example refund
+              // Optional refund
+              // playerNotifier.addEnergy(spawnEnergyCost);
             }
           } else {
-            // Optional: Show feedback if not enough energy
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text("Not enough energy to spawn an item!"),
@@ -392,62 +578,70 @@ class GameGridScreen extends ConsumerWidget {
             );
           }
         },
-        label: const Text('Spawn Item'),
+        label: const Text('Spawn 🌱'), // Update label
         icon: const Icon(Icons.add_circle_outline),
         tooltip: 'Costs $spawnEnergyCost energy',
+        backgroundColor: Colors.teal, // Example color
       ),
+      */
     );
   }
 
-  // --- Helper Widget to Display Orders ---
+  // --- Helper Widget to Display Orders (Keep as is for now) ---
   Widget _buildOrderDisplay(BuildContext context, WidgetRef ref) {
-    final orders = ref.watch(orderProvider); // Watch the list of orders
+    final orders = ref.watch(orderProvider);
 
     if (orders.isEmpty) {
       return const SizedBox(
-        height: 60, // Placeholder height
-        child: Center(child: Text("No active orders.")),
+        height: 60,
+        child: Center(
+          child: Text(
+            "No active orders.",
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
       );
     }
 
     return Container(
-      height: 100, // Adjust height as needed
-      color: Colors.blueGrey.shade100,
+      height: 100,
+      color: Colors.black.withOpacity(0.2), // Darker background
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       child: ListView.builder(
-        scrollDirection: Axis.horizontal, // Display orders horizontally
+        scrollDirection: Axis.horizontal,
         itemCount: orders.length,
         itemBuilder: (context, index) {
           final order = orders[index];
           return Card(
+            color: Colors.blueGrey.shade800, // Darker card
             margin: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Display required item (using the tile content helper)
                   SizedBox(
                     width: 30,
                     height: 30,
                     child: _buildTileContent(order.requiredItemId, size: 24),
                   ),
                   const SizedBox(height: 4),
-                  // Display required count
                   Text(
                     "x ${order.requiredCount}",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white, // White text
+                    ),
                   ),
                   const SizedBox(height: 4),
-                  // Delivery Button
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600, // Button color
                       padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(60, 25), // Smaller button
+                      minimumSize: const Size(60, 25),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                     onPressed: () {
-                      // Call the provider method to attempt delivery
                       ref.read(orderProvider.notifier).attemptDelivery(order);
                     },
                     child: const Text("Deliver"),

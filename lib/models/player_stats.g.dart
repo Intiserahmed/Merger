@@ -27,23 +27,28 @@ const PlayerStatsSchema = CollectionSchema(
       name: r'energy',
       type: IsarType.long,
     ),
-    r'level': PropertySchema(
+    r'gems': PropertySchema(
       id: 2,
+      name: r'gems',
+      type: IsarType.long,
+    ),
+    r'level': PropertySchema(
+      id: 3,
       name: r'level',
       type: IsarType.long,
     ),
     r'maxEnergy': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'maxEnergy',
       type: IsarType.long,
     ),
     r'unlockedZoneIds': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'unlockedZoneIds',
       type: IsarType.stringList,
     ),
     r'xp': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'xp',
       type: IsarType.long,
     )
@@ -86,10 +91,11 @@ void _playerStatsSerialize(
 ) {
   writer.writeLong(offsets[0], object.coins);
   writer.writeLong(offsets[1], object.energy);
-  writer.writeLong(offsets[2], object.level);
-  writer.writeLong(offsets[3], object.maxEnergy);
-  writer.writeStringList(offsets[4], object.unlockedZoneIds);
-  writer.writeLong(offsets[5], object.xp);
+  writer.writeLong(offsets[2], object.gems);
+  writer.writeLong(offsets[3], object.level);
+  writer.writeLong(offsets[4], object.maxEnergy);
+  writer.writeStringList(offsets[5], object.unlockedZoneIds);
+  writer.writeLong(offsets[6], object.xp);
 }
 
 PlayerStats _playerStatsDeserialize(
@@ -101,12 +107,13 @@ PlayerStats _playerStatsDeserialize(
   final object = PlayerStats(
     coins: reader.readLongOrNull(offsets[0]) ?? 50,
     energy: reader.readLongOrNull(offsets[1]) ?? 100,
-    level: reader.readLongOrNull(offsets[2]) ?? 1,
-    maxEnergy: reader.readLongOrNull(offsets[3]) ?? 100,
-    xp: reader.readLongOrNull(offsets[5]) ?? 0,
+    gems: reader.readLongOrNull(offsets[2]) ?? 20,
+    level: reader.readLongOrNull(offsets[3]) ?? 1,
+    maxEnergy: reader.readLongOrNull(offsets[4]) ?? 100,
+    xp: reader.readLongOrNull(offsets[6]) ?? 0,
   );
   object.id = id;
-  object.unlockedZoneIds = reader.readStringList(offsets[4]) ?? [];
+  object.unlockedZoneIds = reader.readStringList(offsets[5]) ?? [];
   return object;
 }
 
@@ -122,12 +129,14 @@ P _playerStatsDeserializeProp<P>(
     case 1:
       return (reader.readLongOrNull(offset) ?? 100) as P;
     case 2:
-      return (reader.readLongOrNull(offset) ?? 1) as P;
+      return (reader.readLongOrNull(offset) ?? 20) as P;
     case 3:
-      return (reader.readLongOrNull(offset) ?? 100) as P;
+      return (reader.readLongOrNull(offset) ?? 1) as P;
     case 4:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readLongOrNull(offset) ?? 100) as P;
     case 5:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 6:
       return (reader.readLongOrNull(offset) ?? 0) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -327,6 +336,59 @@ extension PlayerStatsQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'energy',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition> gemsEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'gems',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition> gemsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'gems',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition> gemsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'gems',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition> gemsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'gems',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -811,6 +873,18 @@ extension PlayerStatsQuerySortBy
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByGems() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'gems', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByGemsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'gems', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByLevel() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'level', Sort.asc);
@@ -871,6 +945,18 @@ extension PlayerStatsQuerySortThenBy
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByEnergyDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'energy', Sort.desc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByGems() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'gems', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByGemsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'gems', Sort.desc);
     });
   }
 
@@ -937,6 +1023,12 @@ extension PlayerStatsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QDistinct> distinctByGems() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'gems');
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QDistinct> distinctByLevel() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'level');
@@ -980,6 +1072,12 @@ extension PlayerStatsQueryProperty
   QueryBuilder<PlayerStats, int, QQueryOperations> energyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'energy');
+    });
+  }
+
+  QueryBuilder<PlayerStats, int, QQueryOperations> gemsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'gems');
     });
   }
 

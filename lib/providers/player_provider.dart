@@ -10,6 +10,7 @@ import 'expansion_provider.dart'; // Import expansion provider
 // Consider removing these if PlayerStatsNotifier is the primary way to manage stats
 final energyProvider = StateProvider<int>((ref) => 100); // Initial energy
 final coinsProvider = StateProvider<int>((ref) => 50); // Initial coins
+final gemsProvider = StateProvider<int>((ref) => 20); // Initial gems
 final xpProvider = StateProvider<int>((ref) => 0); // Initial XP
 final playerLevelProvider = StateProvider<int>((ref) => 1); // Initial Level
 
@@ -43,6 +44,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
           level: state.level,
           xp: state.xp,
           coins: state.coins,
+          gems: state.gems, // Include gems
           energy: state.energy + 1, // Increment energy
           maxEnergy: state.maxEnergy,
           initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
@@ -68,6 +70,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level,
       xp: state.xp + amount, // Update XP
       coins: state.coins,
+      gems: state.gems, // Include gems
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
@@ -104,6 +107,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
         level: state.level,
         xp: state.xp,
         coins: state.coins,
+        gems: state.gems, // Include gems
         energy: state.energy - amount, // Update energy
         maxEnergy: state.maxEnergy,
         initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
@@ -129,6 +133,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level,
       xp: state.xp,
       coins: state.coins,
+      gems: state.gems, // Include gems
       energy: newEnergy, // Update energy
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
@@ -143,6 +148,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level,
       xp: state.xp,
       coins: state.coins + amount, // Update coins
+      gems: state.gems, // Include gems
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
@@ -156,6 +162,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
         level: state.level,
         xp: state.xp,
         coins: state.coins - amount, // Update coins
+        gems: state.gems, // Include gems
         energy: state.energy,
         maxEnergy: state.maxEnergy,
         initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
@@ -173,6 +180,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level + 1, // Update level
       xp: 0, // Reset XP on level up? Consider carrying over excess XP
       coins: state.coins,
+      gems: state.gems, // Include gems
       // Increase max energy and refill current energy to the new max
       maxEnergy: state.maxEnergy + 10, // Increase max energy by 10
       energy: state.maxEnergy + 10, // Refill energy to the new max
@@ -193,6 +201,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: loadedStats.level,
       xp: loadedStats.xp,
       coins: loadedStats.coins,
+      gems: loadedStats.gems, // Load gems
       energy: loadedStats.energy,
       maxEnergy: loadedStats.maxEnergy,
       // Load unlocked zones as well
@@ -235,6 +244,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level,
       xp: state.xp,
       coins: state.coins, // Coins already spent by spendCoins call
+      gems: state.gems, // Include gems
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: newUnlockedIds, // Assign the updated list
@@ -251,6 +261,37 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       "Zone '${zoneToUnlock.id}' unlocked successfully for ${zoneToUnlock.unlockCostCoins} coins!",
     );
     return true;
+  }
+
+  // --- Gem Management ---
+  void addGems(int amount) {
+    state = PlayerStats(
+      level: state.level,
+      xp: state.xp,
+      coins: state.coins,
+      gems: state.gems + amount, // Update gems
+      energy: state.energy,
+      maxEnergy: state.maxEnergy,
+      initialUnlockedZoneIds: state.unlockedZoneIds,
+    );
+  }
+
+  bool spendGems(int amount) {
+    if (state.gems >= amount) {
+      state = PlayerStats(
+        level: state.level,
+        xp: state.xp,
+        coins: state.coins,
+        gems: state.gems - amount, // Update gems
+        energy: state.energy,
+        maxEnergy: state.maxEnergy,
+        initialUnlockedZoneIds: state.unlockedZoneIds,
+      );
+      return true;
+    } else {
+      print("Not enough gems!");
+      return false;
+    }
   }
 }
 
