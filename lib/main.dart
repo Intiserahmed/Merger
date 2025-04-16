@@ -1,14 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
-// Import your main screen widget if it's in a separate file
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar/isar.dart';
+import 'package:path_provider/path_provider.dart';
+import 'models/player_stats.dart'; // Import schemas
+import 'models/tile_data.dart';
+import 'models/order.dart';
 import 'widgets/game_grid_screen.dart';
+import 'persistence/game_service.dart'; // Import the service
 
-// Wrap your MyApp widget with ProviderScope
-void main() {
+// Global Isar instance (consider a more robust DI approach for larger apps)
+late Isar isar;
+
+Future<void> main() async {
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Isar
+  final dir = await getApplicationDocumentsDirectory();
+  isar = await Isar.open(
+    [PlayerStatsSchema, TileDataSchema, OrderSchema], // Add all schemas
+    directory: dir.path,
+    name: 'mergerGameDB', // Optional custom name
+  );
+
+  // Create ProviderContainer to access providers before runApp
+  final container = ProviderContainer();
+
+  // Load game data after Isar is initialized
+  // We need the container to read/write providers
+  await GameService(isar, container).loadGame();
+
   runApp(
-    const ProviderScope(
-      // Add ProviderScope here
-      child: MyApp(),
+    UncontrolledProviderScope(
+      container: container, // Use the same container
+      child: const MyApp(),
     ),
   );
 }

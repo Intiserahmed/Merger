@@ -3,32 +3,56 @@ import 'dart:math'; // For finding random empty tile later if needed
 import 'dart:async'; // For Future/delay if needed for cooldown visuals
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:collection/collection.dart'; // For deep map equality if needed
+// import 'package:collection/collection.dart'; // Not currently used
 import '../models/tile_data.dart';
+import '../models/tile_unlock.dart'; // Import TileUnlock
 import 'player_provider.dart'; // Import player provider for energy checks
+import 'expansion_provider.dart'; // Import expansion provider
 
 // --- Generator Definitions ---
 const String barracksEmoji = '🏕️';
 const String mineEmoji = '⛏️';
 const String swordEmoji = '⚔️';
 const String coinEmoji = '💰';
+const String lockedEmoji = '🔒'; // Emoji for locked tiles
+const String defaultEmptyBase = '🟫'; // Default base for empty/unlocked tiles
 
 const int barracksCooldown = 15; // seconds
 const int mineCooldown = 30; // seconds
 const int barracksEnergyCost = 5;
 const int mineEnergyCost = 2;
 
+// Constants moved from expansion_provider to be central here
 const int rowCount = 11;
 const int colCount = 6;
 
 class GridNotifier extends StateNotifier<List<List<TileData>>> {
   final Ref ref; // Add ref to access other providers
 
-  // Initialize the grid in the constructor by calling a helper
-  GridNotifier(this.ref) : super(_initializeGridData());
+  // Initialize the grid in the constructor by calling the non-static helper
+  GridNotifier(this.ref) : super([]) {
+    // Initialize state after construction to access ref
+    state = _initializeGridData();
+    _watchUnlocks(); // Start listening for zone unlocks
+  }
 
-  // --- Initialization Logic (using Emojis & TileType) ---
-  static List<List<TileData>> _initializeGridData() {
+  // --- Initialization Logic (Now Non-Static) ---
+  List<List<TileData>> _initializeGridData() {
+    // Read unlock status needed for initialization
+    final allUnlocks = ref.read(allUnlocksProvider);
+    final unlockedIds = ref.read(unlockedStatusProvider);
+
+    // Determine which tiles are initially locked
+    final lockedTiles = <Point>{};
+    for (final unlock in allUnlocks) {
+      if (!unlockedIds.contains(unlock.id)) {
+        for (final point in unlock.coveredTiles) {
+          // Add Point directly, assuming Point has == and hashCode
+          lockedTiles.add(point);
+        }
+      }
+    }
+
     // Define Emojis (Makes it easy to change later)
     const String sand = '🟫'; // Brown Square for Sand
     const String grass = '🟩'; // Green Square for Grass
@@ -38,43 +62,67 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     const String photo = '🖼️';
     const String star = '⭐';
     const String sword = '⚔️'; // Keeping sword as per previous code
-    const String defaultEmpty = sand; // Default base tile
 
     return List.generate(rowCount, (row) {
       return List.generate(colCount, (col) {
-        // --- Map layout using Emojis & TileType ---
-        // Most tiles are items or empty. Generators will be placed later.
+        final currentPoint = Point(row, col); // Create Point for lookup
+
+        // --- Check if tile is locked first ---
+        if (lockedTiles.contains(currentPoint)) {
+          return TileData(
+            row: row, // Add row
+            col: col, // Add col
+            type: TileType.locked,
+            baseImagePath: lockedEmoji, // Use lock emoji for base
+          );
+        }
+
+        // --- Existing Map layout ---
+        // (Keep the existing layout logic for unlocked tiles)
+        // Add row/col to all TileData instantiations
         if (row == 0 && col == 4)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 11,
           );
         if (row == 0 && col == 5)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 11,
           );
         if (row == 1 && col == 3)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.empty,
             baseImagePath: grass,
           ); // Grass tile
         if (row == 1 && col == 4)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 10,
           );
         if (row == 1 && col == 5)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 10,
           );
         if (row == 1 && col == 2)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 9,
@@ -82,48 +130,64 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
         if (row == 2 && col == 0)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 8,
           );
         if (row == 2 && col == 1)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 8,
           );
         if (row == 2 && col == 3)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.empty,
             baseImagePath: grass,
           ); // Grass tile
 
         if (row == 3 && col == 0)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 8,
           );
         if (row == 3 && col == 1)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 7,
           );
         if (row == 3 && col == 2)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: photo,
           ); // Photo item
         if (row == 3 && col == 5)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 6,
           );
         if (row == 3 && col == 4)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 6,
@@ -131,36 +195,48 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
         if (row == 4 && col == 0)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 8,
           );
         if (row == 4 && col == 1)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
         if (row == 4 && col == 2)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: sword,
           ); // Sword item
         if (row == 4 && col == 3)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: star,
           ); // Star item
         if (row == 4 && col == 4)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
         if (row == 4 && col == 5)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 6,
@@ -168,18 +244,24 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
         if (row == 5 && col == 0)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 8,
           );
         if (row == 5 && col == 1)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: shell,
           ); // Shell item
         if (row == 5 && col == 2)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: shell,
@@ -187,18 +269,24 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
         if (row == 6 && col == 0)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             overlayNumber: 8,
           );
         if (row == 6 && col == 1)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
         if (row == 6 && col == 2)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: castle,
@@ -206,6 +294,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
         if (row == 7 && col == 0)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: photo,
@@ -213,14 +303,80 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
         if (row < 2 && col < 4)
           return TileData(
+            row: row,
+            col: col,
             type: TileType.empty,
             baseImagePath: grass,
           ); // Top left grassy area
 
         // Default: Plain empty tile
-        return TileData(type: TileType.empty, baseImagePath: defaultEmpty);
+        return TileData(
+          row: row,
+          col: col,
+          type: TileType.empty,
+          baseImagePath: defaultEmptyBase,
+        );
       });
     });
+  }
+
+  // --- Watch for Unlocks ---
+  void _watchUnlocks() {
+    ref.listen<Set<String>>(unlockedStatusProvider, (previous, next) {
+      final previouslyUnlocked = previous ?? <String>{};
+      final newlyUnlockedIds = next.difference(previouslyUnlocked);
+
+      if (newlyUnlockedIds.isNotEmpty) {
+        print("Detected new unlocks: $newlyUnlockedIds");
+        final allUnlocks = ref.read(allUnlocksProvider);
+        for (final zoneId in newlyUnlockedIds) {
+          final zone = allUnlocks.firstWhere(
+            (u) => u.id == zoneId,
+            orElse:
+                () => TileUnlock(
+                  id: 'not_found',
+                  requiredLevel: 0,
+                ), // Should not happen
+          );
+          if (zone.id != 'not_found') {
+            _unlockTilesForZone(zone);
+          }
+        }
+      }
+    });
+  }
+
+  // --- Unlock Tiles Method ---
+  void _unlockTilesForZone(TileUnlock zone) {
+    print("Unlocking tiles for zone: ${zone.id}");
+    final currentGrid = state;
+    final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
+    bool changed = false;
+
+    for (final point in zone.coveredTiles) {
+      if (point.row >= 0 &&
+          point.row < rowCount &&
+          point.col >= 0 &&
+          point.col < colCount) {
+        // Check if the tile is currently locked before changing it
+        if (newGrid[point.row][point.col].type == TileType.locked) {
+          // Replace locked tile with a default empty tile
+          newGrid[point.row][point.col] = TileData(
+            row: point.row, // Add row
+            col: point.col, // Add col
+            type: TileType.empty,
+            baseImagePath: defaultEmptyBase, // Use default sand/dirt base
+            // TODO: Could potentially use a different base image based on zone type
+          );
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      state = newGrid;
+      print("Grid updated for unlocked zone: ${zone.id}");
+    }
   }
 
   // --- Methods to Modify State ---
@@ -233,19 +389,30 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     final targetTile = currentGrid[targetRow][targetCol];
     final sourceTile = currentGrid[sourceRow][sourceCol];
 
+    // Prevent merging onto or dragging from locked tiles
+    if (targetTile.isLocked || sourceTile.isLocked) {
+      print("Cannot merge with locked tiles.");
+      return;
+    }
+
     // Example merge rule: Only merge identical overlay numbers > 0
     if (targetTile.overlayNumber > 0 &&
         targetTile.overlayNumber == sourceTile.overlayNumber) {
       // Create the new data for the target and source tiles
       final mergedValue = targetTile.overlayNumber + 1; // Or your merge logic
       final newTargetData = TileData(
+        row: targetRow,
+        col: targetCol, // Add row/col
         baseImagePath: targetTile.baseImagePath, // Keep base
         overlayNumber: mergedValue,
       );
 
       // Clear the source tile (replace with default empty tile)
-      const String defaultBase = '🟫'; // Use emoji default
-      final newSourceData = TileData(baseImagePath: defaultBase); // Empty tile
+      final newSourceData = TileData(
+        row: sourceRow,
+        col: sourceCol, // Add row/col
+        baseImagePath: defaultEmptyBase,
+      ); // Empty tile
 
       // --- Create a NEW grid state (Immutability!) ---
       final newGrid =
@@ -257,6 +424,14 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
       // Assign the new grid to the state
       state = newGrid;
+
+      // --- Add XP for Number Merge ---
+      const int numberMergeXpThreshold = 5; // Grant XP for merging numbers >= 5
+      if (mergedValue >= numberMergeXpThreshold) {
+        final xpGained = mergedValue * 2; // Example XP formula
+        ref.read(playerStatsProvider.notifier).addXp(xpGained);
+        print("Gained $xpGained XP for merging number $mergedValue");
+      }
     }
     // --- Add Item Merge Logic ---
     else if (targetTile.itemImagePath != null && // Target must have an item
@@ -278,14 +453,17 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       if (mergedItemPath != null) {
         // Create new data for target and source
         final newTargetData = TileData(
+          row: targetRow,
+          col: targetCol, // Add row/col
           baseImagePath: targetTile.baseImagePath, // Keep base
           itemImagePath: mergedItemPath, // Set the new merged item
           overlayNumber: 0, // Merged items usually don't have numbers
         );
 
-        const String defaultBase = '🟫'; // Use emoji default for empty
         final newSourceData = TileData(
-          baseImagePath: defaultBase,
+          row: sourceRow,
+          col: sourceCol, // Add row/col
+          baseImagePath: defaultEmptyBase,
         ); // Clear source
 
         // Create a NEW grid state
@@ -298,6 +476,18 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
         // Assign the new grid to the state
         state = newGrid;
+
+        // --- Add XP for Item Merge ---
+        int xpGained = 0;
+        if (mergedItemPath == '⭐') {
+          xpGained = 15; // XP for creating a Star
+        } else if (mergedItemPath == '🛡️') {
+          xpGained = 25; // XP for creating a Shield
+        }
+        if (xpGained > 0) {
+          ref.read(playerStatsProvider.notifier).addXp(xpGained);
+          print("Gained $xpGained XP for merging into $mergedItemPath");
+        }
       }
     }
     // Add more item merge rules with 'else if' blocks as needed
@@ -305,8 +495,14 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
   /// Updates a single tile's data. Use this for placing items, generators, etc.
   void updateTile(int row, int col, TileData newTileData) {
-    if (row < 0 || row >= rowCount || col < 0 || col >= colCount)
+    if (row < 0 || row >= rowCount || col < 0 || col >= colCount) {
       return; // Bounds check
+    }
+    // Prevent updating locked tiles directly unless it's an unlock operation
+    if (state[row][col].isLocked && newTileData.type != TileType.empty) {
+      print("Cannot update a locked tile directly.");
+      return;
+    }
 
     final currentGrid = state;
     final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
@@ -321,14 +517,24 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     final currentGrid = state;
     final tile = currentGrid[row][col];
 
+    // Prevent interacting with locked tiles
+    if (tile.isLocked) return;
+
     if (tile.overlayNumber > 0) {
       final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
       final newNumber = tile.overlayNumber - 1;
       // Create a new TileData instance with updated values
       newGrid[row][col] = TileData(
+        row: row,
+        col: col, // Add row/col
         baseImagePath: tile.baseImagePath, // Keep existing base image
         itemImagePath: tile.itemImagePath, // Keep existing item image
         overlayNumber: newNumber,
+        // Copy other relevant fields if necessary (like generator info if applicable)
+        generatesItemPath: tile.generatesItemPath,
+        cooldownSeconds: tile.cooldownSeconds,
+        lastUsedTimestamp: tile.lastUsedTimestamp,
+        energyCost: tile.energyCost,
         // If number reaches 0, potentially reveal an item or just empty tile
         // itemImagePath: newNumber == 0 ? getRevealedItem(...) : null, // Example: clear item if number is 0
       );
@@ -342,9 +548,10 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     final currentGrid = state;
     int? emptyRow, emptyCol;
 
-    // Find the first empty tile
+    // Find the first empty tile (that isn't locked)
     for (int r = 0; r < rowCount; r++) {
       for (int c = 0; c < colCount; c++) {
+        // Check for empty AND not locked
         if (currentGrid[r][c].type == TileType.empty) {
           emptyRow = r;
           emptyCol = c;
@@ -358,6 +565,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       // Create new tile data with the item
       final currentTile = currentGrid[emptyRow][emptyCol];
       final newTileData = TileData(
+        row: emptyRow,
+        col: emptyCol, // Add row/col
         type: TileType.item, // It's now an item tile
         baseImagePath: currentTile.baseImagePath, // Keep the base
         itemImagePath: itemEmoji,
@@ -368,8 +577,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       updateTile(emptyRow, emptyCol, newTileData);
       return true; // Item spawned successfully
     } else {
-      print("No empty tile found to spawn item.");
-      return false; // No empty tile found
+      print("No empty, unlocked tile found to spawn item.");
+      return false; // No suitable empty tile found
     }
   }
 
@@ -378,9 +587,17 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
   void placeGenerator(int row, int col, String generatorEmoji) {
     if (row < 0 || row >= rowCount || col < 0 || col >= colCount) return;
 
+    // Prevent placing on locked tiles
+    if (state[row][col].isLocked) {
+      print("Cannot place generator on a locked tile.");
+      return;
+    }
+
     TileData generatorData;
     if (generatorEmoji == barracksEmoji) {
       generatorData = TileData(
+        row: row,
+        col: col, // Add row/col
         type: TileType.generator,
         baseImagePath: generatorEmoji, // Use emoji as base image
         generatesItemPath: swordEmoji,
@@ -389,6 +606,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       );
     } else if (generatorEmoji == mineEmoji) {
       generatorData = TileData(
+        row: row,
+        col: col, // Add row/col
         type: TileType.generator,
         baseImagePath: generatorEmoji,
         generatesItemPath: coinEmoji,
@@ -410,6 +629,9 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
     final currentGrid = state;
     final TileData generatorTile = currentGrid[row][col];
+
+    // Prevent activating locked tiles (shouldn't happen if placement is blocked)
+    if (generatorTile.isLocked) return;
 
     // 1. Check if it's actually a ready generator
     if (!generatorTile.isGenerator) {
@@ -434,9 +656,10 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       return;
     }
 
-    // 3. Find Adjacent Empty Tile
+    // 3. Find Adjacent Empty Tile (that isn't locked)
     int? targetRow, targetCol;
-    final List<Point<int>> neighbors = [
+    // Use the Point class from tile_unlock.dart (no type arguments)
+    final List<Point> neighbors = [
       Point(row - 1, col), Point(row + 1, col),
       Point(row, col - 1), Point(row, col + 1),
       // Optional: Add diagonals if desired
@@ -445,9 +668,10 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     ];
 
     for (final neighbor in neighbors) {
-      final r = neighbor.x;
-      final c = neighbor.y;
-      // Check bounds and if the tile is empty
+      // Use .row and .col instead of .x and .y
+      final r = neighbor.row;
+      final c = neighbor.col;
+      // Check bounds and if the tile is empty AND not locked
       if (r >= 0 &&
           r < rowCount &&
           c >= 0 &&
@@ -455,7 +679,7 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
           currentGrid[r][c].type == TileType.empty) {
         targetRow = r;
         targetCol = c;
-        break; // Found the first empty neighbor
+        break; // Found the first suitable neighbor
       }
     }
 
@@ -463,6 +687,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     if (targetRow != null && targetCol != null) {
       // Create the spawned item tile data
       final spawnedItemData = TileData(
+        row: targetRow,
+        col: targetCol, // Add row/col
         type: TileType.item,
         baseImagePath:
             currentGrid[targetRow][targetCol].baseImagePath, // Keep base
@@ -472,6 +698,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
       // Create updated generator tile data (with new timestamp)
       final updatedGeneratorData = TileData(
+        row: row,
+        col: col, // Add row/col
         type: generatorTile.type,
         baseImagePath: generatorTile.baseImagePath,
         itemImagePath: generatorTile.itemImagePath,
@@ -493,7 +721,9 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         "Generator at ($row, $col) activated, spawned ${generatorTile.generatesItemPath} at ($targetRow, $targetCol).",
       );
     } else {
-      print("No empty adjacent tile found for generator at ($row, $col).");
+      print(
+        "No empty, unlocked adjacent tile found for generator at ($row, $col).",
+      );
       // Refund energy since item couldn't be placed
       playerNotifier.addEnergy(
         generatorTile.energyCost,

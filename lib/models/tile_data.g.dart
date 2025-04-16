@@ -22,58 +22,68 @@ const TileDataSchema = CollectionSchema(
       name: r'baseImagePath',
       type: IsarType.string,
     ),
-    r'cooldownSeconds': PropertySchema(
+    r'col': PropertySchema(
       id: 1,
+      name: r'col',
+      type: IsarType.long,
+    ),
+    r'cooldownSeconds': PropertySchema(
+      id: 2,
       name: r'cooldownSeconds',
       type: IsarType.long,
     ),
     r'energyCost': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'energyCost',
       type: IsarType.long,
     ),
     r'generatesItemPath': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'generatesItemPath',
       type: IsarType.string,
     ),
     r'isEmpty': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'isEmpty',
       type: IsarType.bool,
     ),
     r'isGenerator': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'isGenerator',
       type: IsarType.bool,
     ),
     r'isItem': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'isItem',
       type: IsarType.bool,
     ),
     r'isLocked': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isLocked',
       type: IsarType.bool,
     ),
     r'itemImagePath': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'itemImagePath',
       type: IsarType.string,
     ),
     r'lastUsedTimestamp': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'lastUsedTimestamp',
       type: IsarType.dateTime,
     ),
     r'overlayNumber': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'overlayNumber',
       type: IsarType.long,
     ),
+    r'row': PropertySchema(
+      id: 12,
+      name: r'row',
+      type: IsarType.long,
+    ),
     r'type': PropertySchema(
-      id: 11,
+      id: 13,
       name: r'type',
       type: IsarType.byte,
       enumMap: _TileDatatypeEnumValueMap,
@@ -84,7 +94,34 @@ const TileDataSchema = CollectionSchema(
   deserialize: _tileDataDeserialize,
   deserializeProp: _tileDataDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'row': IndexSchema(
+      id: -2734084670436536211,
+      name: r'row',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'row',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'col': IndexSchema(
+      id: 2387585023331177592,
+      name: r'col',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'col',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _tileDataGetId,
@@ -122,17 +159,19 @@ void _tileDataSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.baseImagePath);
-  writer.writeLong(offsets[1], object.cooldownSeconds);
-  writer.writeLong(offsets[2], object.energyCost);
-  writer.writeString(offsets[3], object.generatesItemPath);
-  writer.writeBool(offsets[4], object.isEmpty);
-  writer.writeBool(offsets[5], object.isGenerator);
-  writer.writeBool(offsets[6], object.isItem);
-  writer.writeBool(offsets[7], object.isLocked);
-  writer.writeString(offsets[8], object.itemImagePath);
-  writer.writeDateTime(offsets[9], object.lastUsedTimestamp);
-  writer.writeLong(offsets[10], object.overlayNumber);
-  writer.writeByte(offsets[11], object.type.index);
+  writer.writeLong(offsets[1], object.col);
+  writer.writeLong(offsets[2], object.cooldownSeconds);
+  writer.writeLong(offsets[3], object.energyCost);
+  writer.writeString(offsets[4], object.generatesItemPath);
+  writer.writeBool(offsets[5], object.isEmpty);
+  writer.writeBool(offsets[6], object.isGenerator);
+  writer.writeBool(offsets[7], object.isItem);
+  writer.writeBool(offsets[8], object.isLocked);
+  writer.writeString(offsets[9], object.itemImagePath);
+  writer.writeDateTime(offsets[10], object.lastUsedTimestamp);
+  writer.writeLong(offsets[11], object.overlayNumber);
+  writer.writeLong(offsets[12], object.row);
+  writer.writeByte(offsets[13], object.type.index);
 }
 
 TileData _tileDataDeserialize(
@@ -143,14 +182,16 @@ TileData _tileDataDeserialize(
 ) {
   final object = TileData(
     baseImagePath: reader.readString(offsets[0]),
-    cooldownSeconds: reader.readLongOrNull(offsets[1]) ?? 0,
-    energyCost: reader.readLongOrNull(offsets[2]) ?? 0,
-    generatesItemPath: reader.readStringOrNull(offsets[3]),
+    col: reader.readLong(offsets[1]),
+    cooldownSeconds: reader.readLongOrNull(offsets[2]) ?? 0,
+    energyCost: reader.readLongOrNull(offsets[3]) ?? 0,
+    generatesItemPath: reader.readStringOrNull(offsets[4]),
     id: id,
-    itemImagePath: reader.readStringOrNull(offsets[8]),
-    lastUsedTimestamp: reader.readDateTimeOrNull(offsets[9]),
-    overlayNumber: reader.readLongOrNull(offsets[10]) ?? 0,
-    type: _TileDatatypeValueEnumMap[reader.readByteOrNull(offsets[11])] ??
+    itemImagePath: reader.readStringOrNull(offsets[9]),
+    lastUsedTimestamp: reader.readDateTimeOrNull(offsets[10]),
+    overlayNumber: reader.readLongOrNull(offsets[11]) ?? 0,
+    row: reader.readLong(offsets[12]),
+    type: _TileDatatypeValueEnumMap[reader.readByteOrNull(offsets[13])] ??
         TileType.empty,
   );
   return object;
@@ -166,13 +207,13 @@ P _tileDataDeserializeProp<P>(
     case 0:
       return (reader.readString(offset)) as P;
     case 1:
-      return (reader.readLongOrNull(offset) ?? 0) as P;
+      return (reader.readLong(offset)) as P;
     case 2:
       return (reader.readLongOrNull(offset) ?? 0) as P;
     case 3:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset) ?? 0) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
       return (reader.readBool(offset)) as P;
     case 6:
@@ -180,12 +221,16 @@ P _tileDataDeserializeProp<P>(
     case 7:
       return (reader.readBool(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 9:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 10:
-      return (reader.readLongOrNull(offset) ?? 0) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 11:
+      return (reader.readLongOrNull(offset) ?? 0) as P;
+    case 12:
+      return (reader.readLong(offset)) as P;
+    case 13:
       return (_TileDatatypeValueEnumMap[reader.readByteOrNull(offset)] ??
           TileType.empty) as P;
     default:
@@ -222,6 +267,22 @@ extension TileDataQueryWhereSort on QueryBuilder<TileData, TileData, QWhere> {
   QueryBuilder<TileData, TileData, QAfterWhere> anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhere> anyRow() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'row'),
+      );
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhere> anyCol() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'col'),
+      );
     });
   }
 }
@@ -287,6 +348,182 @@ extension TileDataQueryWhere on QueryBuilder<TileData, TileData, QWhereClause> {
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> rowEqualTo(int row) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'row',
+        value: [row],
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> rowNotEqualTo(int row) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'row',
+              lower: [],
+              upper: [row],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'row',
+              lower: [row],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'row',
+              lower: [row],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'row',
+              lower: [],
+              upper: [row],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> rowGreaterThan(
+    int row, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'row',
+        lower: [row],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> rowLessThan(
+    int row, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'row',
+        lower: [],
+        upper: [row],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> rowBetween(
+    int lowerRow,
+    int upperRow, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'row',
+        lower: [lowerRow],
+        includeLower: includeLower,
+        upper: [upperRow],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> colEqualTo(int col) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'col',
+        value: [col],
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> colNotEqualTo(int col) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'col',
+              lower: [],
+              upper: [col],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'col',
+              lower: [col],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'col',
+              lower: [col],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'col',
+              lower: [],
+              upper: [col],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> colGreaterThan(
+    int col, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'col',
+        lower: [col],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> colLessThan(
+    int col, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'col',
+        lower: [],
+        upper: [col],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterWhereClause> colBetween(
+    int lowerCol,
+    int upperCol, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'col',
+        lower: [lowerCol],
+        includeLower: includeLower,
+        upper: [upperCol],
         includeUpper: includeUpper,
       ));
     });
@@ -425,6 +662,59 @@ extension TileDataQueryFilter
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'baseImagePath',
         value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> colEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'col',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> colGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'col',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> colLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'col',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> colBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'col',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -1064,6 +1354,59 @@ extension TileDataQueryFilter
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> rowEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'row',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> rowGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'row',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> rowLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'row',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterFilterCondition> rowBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'row',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterFilterCondition> typeEqualTo(
       TileType value) {
     return QueryBuilder.apply(this, (query) {
@@ -1134,6 +1477,18 @@ extension TileDataQuerySortBy on QueryBuilder<TileData, TileData, QSortBy> {
   QueryBuilder<TileData, TileData, QAfterSortBy> sortByBaseImagePathDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'baseImagePath', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByCol() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'col', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByColDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'col', Sort.desc);
     });
   }
 
@@ -1257,6 +1612,18 @@ extension TileDataQuerySortBy on QueryBuilder<TileData, TileData, QSortBy> {
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByRow() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'row', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> sortByRowDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'row', Sort.desc);
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterSortBy> sortByType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'type', Sort.asc);
@@ -1281,6 +1648,18 @@ extension TileDataQuerySortThenBy
   QueryBuilder<TileData, TileData, QAfterSortBy> thenByBaseImagePathDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'baseImagePath', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByCol() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'col', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByColDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'col', Sort.desc);
     });
   }
 
@@ -1416,6 +1795,18 @@ extension TileDataQuerySortThenBy
     });
   }
 
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByRow() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'row', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QAfterSortBy> thenByRowDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'row', Sort.desc);
+    });
+  }
+
   QueryBuilder<TileData, TileData, QAfterSortBy> thenByType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'type', Sort.asc);
@@ -1436,6 +1827,12 @@ extension TileDataQueryWhereDistinct
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'baseImagePath',
           caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<TileData, TileData, QDistinct> distinctByCol() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'col');
     });
   }
 
@@ -1503,6 +1900,12 @@ extension TileDataQueryWhereDistinct
     });
   }
 
+  QueryBuilder<TileData, TileData, QDistinct> distinctByRow() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'row');
+    });
+  }
+
   QueryBuilder<TileData, TileData, QDistinct> distinctByType() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'type');
@@ -1521,6 +1924,12 @@ extension TileDataQueryProperty
   QueryBuilder<TileData, String, QQueryOperations> baseImagePathProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'baseImagePath');
+    });
+  }
+
+  QueryBuilder<TileData, int, QQueryOperations> colProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'col');
     });
   }
 
@@ -1583,6 +1992,12 @@ extension TileDataQueryProperty
   QueryBuilder<TileData, int, QQueryOperations> overlayNumberProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'overlayNumber');
+    });
+  }
+
+  QueryBuilder<TileData, int, QQueryOperations> rowProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'row');
     });
   }
 

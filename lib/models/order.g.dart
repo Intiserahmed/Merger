@@ -17,33 +17,28 @@ const OrderSchema = CollectionSchema(
   name: r'Order',
   id: 103494837486634173,
   properties: {
-    r'currentCount': PropertySchema(
-      id: 0,
-      name: r'currentCount',
-      type: IsarType.long,
-    ),
     r'id': PropertySchema(
-      id: 1,
+      id: 0,
       name: r'id',
       type: IsarType.string,
     ),
     r'requiredCount': PropertySchema(
-      id: 2,
+      id: 1,
       name: r'requiredCount',
       type: IsarType.long,
     ),
     r'requiredItemId': PropertySchema(
-      id: 3,
+      id: 2,
       name: r'requiredItemId',
       type: IsarType.string,
     ),
     r'rewardCoins': PropertySchema(
-      id: 4,
+      id: 3,
       name: r'rewardCoins',
       type: IsarType.long,
     ),
     r'rewardXp': PropertySchema(
-      id: 5,
+      id: 4,
       name: r'rewardXp',
       type: IsarType.long,
     )
@@ -79,12 +74,11 @@ void _orderSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.currentCount);
-  writer.writeString(offsets[1], object.id);
-  writer.writeLong(offsets[2], object.requiredCount);
-  writer.writeString(offsets[3], object.requiredItemId);
-  writer.writeLong(offsets[4], object.rewardCoins);
-  writer.writeLong(offsets[5], object.rewardXp);
+  writer.writeString(offsets[0], object.id);
+  writer.writeLong(offsets[1], object.requiredCount);
+  writer.writeString(offsets[2], object.requiredItemId);
+  writer.writeLong(offsets[3], object.rewardCoins);
+  writer.writeLong(offsets[4], object.rewardXp);
 }
 
 Order _orderDeserialize(
@@ -94,12 +88,11 @@ Order _orderDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Order(
-    currentCount: reader.readLongOrNull(offsets[0]) ?? 0,
-    id: reader.readString(offsets[1]),
-    requiredCount: reader.readLong(offsets[2]),
-    requiredItemId: reader.readString(offsets[3]),
-    rewardCoins: reader.readLong(offsets[4]),
-    rewardXp: reader.readLong(offsets[5]),
+    id: reader.readString(offsets[0]),
+    requiredCount: reader.readLong(offsets[1]),
+    requiredItemId: reader.readString(offsets[2]),
+    rewardCoins: reader.readLong(offsets[3]),
+    rewardXp: reader.readLong(offsets[4]),
   );
   object.isarId = id;
   return object;
@@ -113,16 +106,14 @@ P _orderDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readLongOrNull(offset) ?? 0) as P;
+      return (reader.readString(offset)) as P;
     case 1:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 2:
-      return (reader.readLong(offset)) as P;
-    case 3:
       return (reader.readString(offset)) as P;
-    case 4:
+    case 3:
       return (reader.readLong(offset)) as P;
-    case 5:
+    case 4:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -217,59 +208,6 @@ extension OrderQueryWhere on QueryBuilder<Order, Order, QWhereClause> {
 }
 
 extension OrderQueryFilter on QueryBuilder<Order, Order, QFilterCondition> {
-  QueryBuilder<Order, Order, QAfterFilterCondition> currentCountEqualTo(
-      int value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'currentCount',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<Order, Order, QAfterFilterCondition> currentCountGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'currentCount',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<Order, Order, QAfterFilterCondition> currentCountLessThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'currentCount',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<Order, Order, QAfterFilterCondition> currentCountBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'currentCount',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
   QueryBuilder<Order, Order, QAfterFilterCondition> idEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -744,18 +682,6 @@ extension OrderQueryObject on QueryBuilder<Order, Order, QFilterCondition> {}
 extension OrderQueryLinks on QueryBuilder<Order, Order, QFilterCondition> {}
 
 extension OrderQuerySortBy on QueryBuilder<Order, Order, QSortBy> {
-  QueryBuilder<Order, Order, QAfterSortBy> sortByCurrentCount() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'currentCount', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Order, Order, QAfterSortBy> sortByCurrentCountDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'currentCount', Sort.desc);
-    });
-  }
-
   QueryBuilder<Order, Order, QAfterSortBy> sortById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -818,18 +744,6 @@ extension OrderQuerySortBy on QueryBuilder<Order, Order, QSortBy> {
 }
 
 extension OrderQuerySortThenBy on QueryBuilder<Order, Order, QSortThenBy> {
-  QueryBuilder<Order, Order, QAfterSortBy> thenByCurrentCount() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'currentCount', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Order, Order, QAfterSortBy> thenByCurrentCountDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'currentCount', Sort.desc);
-    });
-  }
-
   QueryBuilder<Order, Order, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -904,12 +818,6 @@ extension OrderQuerySortThenBy on QueryBuilder<Order, Order, QSortThenBy> {
 }
 
 extension OrderQueryWhereDistinct on QueryBuilder<Order, Order, QDistinct> {
-  QueryBuilder<Order, Order, QDistinct> distinctByCurrentCount() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'currentCount');
-    });
-  }
-
   QueryBuilder<Order, Order, QDistinct> distinctById(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -948,12 +856,6 @@ extension OrderQueryProperty on QueryBuilder<Order, Order, QQueryProperty> {
   QueryBuilder<Order, int, QQueryOperations> isarIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isarId');
-    });
-  }
-
-  QueryBuilder<Order, int, QQueryOperations> currentCountProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'currentCount');
     });
   }
 

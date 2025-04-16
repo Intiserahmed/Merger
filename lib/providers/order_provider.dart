@@ -1,87 +1,158 @@
 // lib/providers/order_provider.dart
+import 'dart:math'; // For random selection
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
+import '../models/tile_data.dart'; // Need TileData
+import 'grid_provider.dart'; // Need GridProvider
+import 'player_provider.dart'; // Need PlayerStatsProvider
+
+// --- Possible Orders ---
+// Define a list of potential orders the game can generate
+final List<Order> _possibleOrders = [
+  Order(
+    id: 'order_star_1',
+    requiredItemId: '⭐',
+    requiredCount: 1,
+    rewardCoins: 50,
+    rewardXp: 10,
+  ),
+  Order(
+    id: 'order_shield_1',
+    requiredItemId: '🛡️',
+    requiredCount: 1,
+    rewardCoins: 100,
+    rewardXp: 25,
+  ),
+  Order(
+    id: 'order_star_3',
+    requiredItemId: '⭐',
+    requiredCount: 3,
+    rewardCoins: 200,
+    rewardXp: 50,
+  ),
+  Order(
+    id: 'order_sword_5', // Example: Order for base items
+    requiredItemId: '⚔️',
+    requiredCount: 5,
+    rewardCoins: 30,
+    rewardXp: 5,
+  ),
+  // Add more diverse orders
+];
 
 class OrderNotifier extends StateNotifier<List<Order>> {
-  OrderNotifier() : super(_generateInitialOrders()); // Start with some orders
+  final Ref ref; // Inject Ref
 
-  static List<Order> _generateInitialOrders() {
-    // TODO: Replace with actual order generation logic
-    return [
-      Order(
-        id: 'order1',
-        requiredItemId: 'item_shell_level_3',
-        requiredCount: 2,
-        rewardCoins: 50,
-        rewardXp: 10,
-      ),
-      Order(
-        id: 'order2',
-        requiredItemId: 'item_castle_level_1',
-        requiredCount: 1,
-        rewardCoins: 100,
-        rewardXp: 25,
-      ),
-    ];
+  OrderNotifier(this.ref)
+    : super(_generateInitialOrders(3)); // Start with 3 orders
+
+  // Generate a specified number of unique initial orders
+  static List<Order> _generateInitialOrders(int count) {
+    final random = Random();
+    final availableOrders = List<Order>.from(_possibleOrders); // Copy the list
+    final initialOrders = <Order>[];
+
+    for (int i = 0; i < count && availableOrders.isNotEmpty; i++) {
+      final randomIndex = random.nextInt(availableOrders.length);
+      initialOrders.add(availableOrders.removeAt(randomIndex));
+    }
+    return initialOrders;
   }
 
-  void fulfillOrder(String orderId, String itemId /*, WidgetRef ref */) {
-    final List<Order> updatedOrders = [];
-    bool orderCompleted = false;
-    Order? completedOrderData;
+  /// Attempts to deliver items for a specific order.
+  /// Checks the grid for required items and consumes them if found.
+  /// Grants rewards and replaces the order if successful.
+  void attemptDelivery(Order orderToDeliver) {
+    final gridState = ref.read(gridProvider);
+    final gridNotifier = ref.read(gridProvider.notifier);
+    final playerNotifier = ref.read(playerStatsProvider.notifier);
 
-    for (var order in state) {
-      if (order.id == orderId &&
-          order.requiredItemId == itemId &&
-          order.currentCount < order.requiredCount) {
-        // Directly modify the mutable order object
-        order.currentCount++;
-        if (order.currentCount == order.requiredCount) {
-          // Order Complete!
-          print("Order ${order.id} complete!");
-          orderCompleted = true;
-          completedOrderData = order;
-          // Don't add the completed order back to the list
-        } else {
-          // Order updated but not complete, add the modified order
-          updatedOrders.add(order);
+    // 1. Count how many of the required item exist on the grid
+    int foundCount = 0;
+    List<Point<int>> itemLocations = []; // Store locations to remove later
+
+    for (int r = 0; r < gridState.length; r++) {
+      for (int c = 0; c < gridState[r].length; c++) {
+        final tile = gridState[r][c];
+        if (tile.itemImagePath == orderToDeliver.requiredItemId) {
+          foundCount++;
+          itemLocations.add(Point(r, c));
         }
-      } else {
-        // Keep other orders as they are
-        updatedOrders.add(order);
+        // Optional: Check overlayNumber if orders require specific tiers
+        // else if (tile.overlayNumber == orderToDeliver.requiredTier && tile.baseImagePath == orderToDeliver.requiredBase) { ... }
       }
     }
 
-    // Update the state with the new list
-    state = updatedOrders;
+    // 2. Check if enough items were found
+    if (foundCount >= orderToDeliver.requiredCount) {
+      print(
+        "Found $foundCount ${orderToDeliver.requiredItemId}(s). Delivering ${orderToDeliver.requiredCount}.",
+      );
 
-    if (orderCompleted && completedOrderData != null) {
-      // Optional: Immediately grant rewards here or call completeOrder
-      // final playerNotifier = ref.read(playerStatsProvider.notifier);
-      // playerNotifier.addCoins(completedOrderData.rewardCoins);
-      // playerNotifier.addXp(completedOrderData.rewardXp);
+      // 3. Consume the required number of items from the grid
+      int consumedCount = 0;
+      for (final location in itemLocations) {
+        if (consumedCount < orderToDeliver.requiredCount) {
+          // Replace the item tile with an empty tile
+          const String defaultBase = '🟫'; // Default empty tile base
+          gridNotifier.updateTile(
+            location.x,
+            location.y,
+            // Add row/col to the empty tile data
+            TileData(
+              row: location.x,
+              col: location.y,
+              baseImagePath: defaultBase,
+            ),
+          );
+          consumedCount++;
+        } else {
+          break; // Stop consuming once requirement is met
+        }
+      }
 
-      // Or just rely on completeOrder being called elsewhere if needed
-      _maybeAddNewOrder(); // Add a new order to replace the completed one
+      // 4. Grant Rewards
+      playerNotifier.addCoins(orderToDeliver.rewardCoins);
+      playerNotifier.addXp(orderToDeliver.rewardXp);
+      print(
+        "Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins and ${orderToDeliver.rewardXp} XP.",
+      );
+
+      // 5. Remove the completed order and add a new one
+      state = state.where((order) => order.id != orderToDeliver.id).toList();
+      _maybeAddNewOrder();
+    } else {
+      print(
+        "Not enough items for order '${orderToDeliver.id}'. Found $foundCount, need ${orderToDeliver.requiredCount}.",
+      );
+      // Optional: Show feedback to the user (e.g., SnackBar)
     }
   }
 
+  // Adds a new random order if the current number of orders is below a threshold
   void _maybeAddNewOrder() {
-    // Logic to add new orders if needed
-  }
+    const int maxActiveOrders = 3; // Keep 3 active orders
+    if (state.length < maxActiveOrders) {
+      final random = Random();
+      final availableOrders = List<Order>.from(_possibleOrders);
+      // Remove orders already active
+      final activeOrderIds = state.map((o) => o.id).toSet();
+      availableOrders.removeWhere((o) => activeOrderIds.contains(o.id));
 
-  // Method to potentially remove/complete an order fully
-  void completeOrder(String orderId /*, WidgetRef ref */) {
-    // Grant rewards by calling player provider methods
-    // final playerNotifier = ref.read(playerStatsProvider.notifier);
-    // playerNotifier.addCoins(completedOrder.rewardCoins);
-    // playerNotifier.addXp(completedOrder.rewardXp);
-
-    state = state.where((order) => order.id != orderId).toList();
-    _maybeAddNewOrder();
+      if (availableOrders.isNotEmpty) {
+        final randomIndex = random.nextInt(availableOrders.length);
+        final newOrder = availableOrders[randomIndex];
+        state = [...state, newOrder]; // Add the new order to the list
+        print("Added new order: ${newOrder.id}");
+      } else {
+        print("No more unique orders available to add.");
+      }
+    }
   }
 }
 
+// Update the provider definition to pass the ref
 final orderProvider = StateNotifierProvider<OrderNotifier, List<Order>>((ref) {
-  return OrderNotifier();
+  return OrderNotifier(ref); // Pass ref here
 });

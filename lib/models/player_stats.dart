@@ -13,6 +13,7 @@ class PlayerStats {
   int coins;
   int energy;
   int maxEnergy; // Maximum energy capacity
+  List<String> unlockedZoneIds; // Store IDs of unlocked zones
 
   // Constructor with default values
   PlayerStats({
@@ -21,7 +22,9 @@ class PlayerStats {
     this.coins = 50, // Starting values
     this.energy = 100,
     this.maxEnergy = 100, // Default max energy
-  });
+    List<String>? initialUnlockedZoneIds, // Make it optional
+  }) : unlockedZoneIds =
+           initialUnlockedZoneIds ?? []; // Initialize to empty list if null
 
   // Note: Removed copyWith, ==, and hashCode
 }

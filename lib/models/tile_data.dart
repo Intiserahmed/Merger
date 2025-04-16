@@ -14,6 +14,12 @@ enum TileType {
 class TileData {
   Id id = Isar.autoIncrement; // Isar requires an Id field
 
+  // Add row and column for persistence
+  @Index() // Index for potentially faster lookups by position
+  late int row;
+  @Index()
+  late int col;
+
   @enumerated
   late TileType type;
 
@@ -32,6 +38,8 @@ class TileData {
   // Default constructor for Isar & general use
   TileData({
     this.id = Isar.autoIncrement,
+    required this.row, // Make row/col required
+    required this.col,
     this.type = TileType.empty, // Default to empty
     required this.baseImagePath,
     this.itemImagePath,

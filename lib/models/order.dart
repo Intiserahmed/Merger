@@ -9,9 +9,9 @@ class Order {
 
   late String
   id; // Keep your original ID if needed, or remove if isarId is sufficient
-  late String requiredItemId; // e.g., 'item_shell_level_3'
+  late String requiredItemId; // e.g., '⭐' or '🛡️'
   late int requiredCount;
-  int currentCount;
+  // Removed currentCount - we will check the grid directly
   late int rewardCoins;
   late int rewardXp;
 
@@ -20,7 +20,7 @@ class Order {
     required this.id,
     required this.requiredItemId,
     required this.requiredCount,
-    this.currentCount = 0,
+    // Removed currentCount from constructor
     required this.rewardCoins,
     required this.rewardXp,
   });

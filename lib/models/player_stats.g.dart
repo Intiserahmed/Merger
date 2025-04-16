@@ -37,8 +37,13 @@ const PlayerStatsSchema = CollectionSchema(
       name: r'maxEnergy',
       type: IsarType.long,
     ),
-    r'xp': PropertySchema(
+    r'unlockedZoneIds': PropertySchema(
       id: 4,
+      name: r'unlockedZoneIds',
+      type: IsarType.stringList,
+    ),
+    r'xp': PropertySchema(
+      id: 5,
       name: r'xp',
       type: IsarType.long,
     )
@@ -63,6 +68,13 @@ int _playerStatsEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.unlockedZoneIds.length * 3;
+  {
+    for (var i = 0; i < object.unlockedZoneIds.length; i++) {
+      final value = object.unlockedZoneIds[i];
+      bytesCount += value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -76,7 +88,8 @@ void _playerStatsSerialize(
   writer.writeLong(offsets[1], object.energy);
   writer.writeLong(offsets[2], object.level);
   writer.writeLong(offsets[3], object.maxEnergy);
-  writer.writeLong(offsets[4], object.xp);
+  writer.writeStringList(offsets[4], object.unlockedZoneIds);
+  writer.writeLong(offsets[5], object.xp);
 }
 
 PlayerStats _playerStatsDeserialize(
@@ -90,9 +103,10 @@ PlayerStats _playerStatsDeserialize(
     energy: reader.readLongOrNull(offsets[1]) ?? 100,
     level: reader.readLongOrNull(offsets[2]) ?? 1,
     maxEnergy: reader.readLongOrNull(offsets[3]) ?? 100,
-    xp: reader.readLongOrNull(offsets[4]) ?? 0,
+    xp: reader.readLongOrNull(offsets[5]) ?? 0,
   );
   object.id = id;
+  object.unlockedZoneIds = reader.readStringList(offsets[4]) ?? [];
   return object;
 }
 
@@ -112,6 +126,8 @@ P _playerStatsDeserializeProp<P>(
     case 3:
       return (reader.readLongOrNull(offset) ?? 100) as P;
     case 4:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 5:
       return (reader.readLongOrNull(offset) ?? 0) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -482,6 +498,233 @@ extension PlayerStatsQueryFilter
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'unlockedZoneIds',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'unlockedZoneIds',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'unlockedZoneIds',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'unlockedZoneIds',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'unlockedZoneIds',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'unlockedZoneIds',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementContains(String value,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'unlockedZoneIds',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementMatches(String pattern,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'unlockedZoneIds',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'unlockedZoneIds',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'unlockedZoneIds',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'unlockedZoneIds',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'unlockedZoneIds',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'unlockedZoneIds',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'unlockedZoneIds',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'unlockedZoneIds',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      unlockedZoneIdsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'unlockedZoneIds',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition> xpEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -706,6 +949,13 @@ extension PlayerStatsQueryWhereDistinct
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QDistinct>
+      distinctByUnlockedZoneIds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'unlockedZoneIds');
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QDistinct> distinctByXp() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'xp');
@@ -742,6 +992,13 @@ extension PlayerStatsQueryProperty
   QueryBuilder<PlayerStats, int, QQueryOperations> maxEnergyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'maxEnergy');
+    });
+  }
+
+  QueryBuilder<PlayerStats, List<String>, QQueryOperations>
+      unlockedZoneIdsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'unlockedZoneIds');
     });
   }
 
