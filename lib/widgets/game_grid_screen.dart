@@ -7,6 +7,8 @@ import 'package:merger/models/tile_unlock.dart';
 import 'package:merger/providers/expansion_provider.dart';
 import 'package:merger/main.dart'; // Import main to access global isar instance
 import 'package:merger/persistence/game_service.dart';
+import 'package:merger/widgets/info_popup.dart'; // Import the InfoPopup
+// No longer need merge_item.dart directly, mergeItemsByEmoji is in merge_trees.dart
 
 import 'dart:math' as math;
 import '../models/tile_data.dart';
@@ -21,9 +23,19 @@ final Color lightBrown = Colors.brown[300]!;
 final Color darkBrown = Colors.brown[600]!;
 final Color grassGreen = Colors.green[400]!;
 
-class GameGridScreen extends ConsumerWidget {
+// Convert to ConsumerStatefulWidget
+class GameGridScreen extends ConsumerStatefulWidget {
   const GameGridScreen({super.key});
 
+  @override
+  ConsumerState<GameGridScreen> createState() => _GameGridScreenState();
+}
+
+// Create the State class
+class _GameGridScreenState extends ConsumerState<GameGridScreen> {
+  TileData? _selectedTile; // State variable for the selected tile
+
+  // --- Helper Methods moved into State class ---
   Widget _buildTileContent(
     String pathOrEmoji, {
     BoxFit fit = BoxFit.contain,
@@ -47,10 +59,11 @@ class GameGridScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildTile(BuildContext context, WidgetRef ref, int index) {
+  // Method now belongs to _GameGridScreenState, uses `ref` directly
+  Widget _buildTile(int index) {
     final int row = index ~/ grid.colCount;
     final int col = index % grid.colCount;
-    final gridData = ref.watch(grid.gridProvider);
+    final gridData = ref.watch(grid.gridProvider); // Use `ref` from State
 
     if (row >= gridData.length || col >= gridData[0].length) {
       return Container(color: Colors.red.withOpacity(0.2));
@@ -228,6 +241,12 @@ class GameGridScreen extends ConsumerWidget {
           // --- GestureDetector for Taps (Locked, Generators, Empty) ---
           return GestureDetector(
             onTap: () {
+              // --- Update Selected Tile State ---
+              setState(() {
+                // Toggle selection: if same tile tapped, deselect; otherwise select new tile.
+                _selectedTile = (_selectedTile == tileData) ? null : tileData;
+              });
+
               // --- Tap Logic for Non-Draggable Tiles ---
               if (tileData.isLocked) {
                 // --- Handle Tapping Locked Tile ---
@@ -304,8 +323,9 @@ class GameGridScreen extends ConsumerWidget {
   }
 
   // --- NEW Build Top Area (HUD) ---
-  Widget _buildTopArea(BuildContext context, WidgetRef ref) {
-    final playerStats = ref.watch(playerStatsProvider);
+  // Method now belongs to _GameGridScreenState, uses `ref` directly
+  Widget _buildTopArea() {
+    final playerStats = ref.watch(playerStatsProvider); // Use `ref` from State
     final level = playerStats.level;
     final energy = playerStats.energy;
     // final maxEnergy = playerStats.maxEnergy; // Not used in new design directly
@@ -397,25 +417,158 @@ class GameGridScreen extends ConsumerWidget {
   }
 
   // --- NEW Build Bottom Info Bar ---
+  // Method now belongs to _GameGridScreenState, uses `context` and `_selectedTile`
   Widget _buildBottomInfoBar() {
-    // TODO: Make text dynamic based on selected tile
-    const String infoText =
-        "Seashell. Merge to reach next level."; // Placeholder
+    // Use the _selectedTile state
+    if (_selectedTile == null || _selectedTile!.isLocked) {
+      // Show nothing or a default message if no valid tile is selected
+      return const SizedBox(height: 50); // Placeholder height
+    }
+
+    final selectedTileData = _selectedTile!; // Guaranteed non-null here
+    final emoji = selectedTileData.itemImagePath;
+    final isGenerator = selectedTileData.isGenerator;
+    final mergeItem = emoji != null ? mergeItemsByEmoji[emoji] : null;
+    final generatorConfig = generatorConfigs[selectedTileData.baseImagePath];
+
+    String infoText = 'Select an item or generator.'; // Default text
+    Widget? popupToShow; // Widget to show on tap
+
+    if (isGenerator && generatorConfig != null) {
+      infoText =
+          'Generator: Produces ${selectedTileData.generatesItemPath ?? '??'}, ' // Added null check
+          'Cooldown: ${generatorConfig.cooldown}s';
+      popupToShow = InfoPopup(
+        generatorEmoji: selectedTileData.baseImagePath,
+        generatorConfig: generatorConfig,
+      );
+    } else if (mergeItem != null) {
+      infoText =
+          '${mergeItem.id.replaceAll("_", " ")} (Lvl ${mergeItem.level}). ' // Added level
+          'Merge to reach next level.';
+      popupToShow = InfoPopup(item: mergeItem);
+    } else if (emoji != null) {
+      // Handle case where it's an item but not in mergeItemsByEmoji (e.g., special items)
+      infoText = 'Item: $emoji';
+    } else {
+      // Empty tile selected (if tap logic allows selecting empty tiles)
+      infoText = 'Empty Tile';
+    }
 
     return Container(
+      height: 50, // Give it a fixed height
       color: Colors.white,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
-        children: const [
-          // Placeholder for Icon(Icons.info_outline)
-          Text('ℹ️', style: TextStyle(fontSize: 18)),
-          SizedBox(width: 8),
-          Text(
-            infoText,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-            ), // Adjusted color
+        children: [
+          GestureDetector(
+            onTap: () {
+              if (popupToShow != null) {
+                showDialog(
+                  context: context, // Use context from State
+                  builder: (_) => popupToShow!,
+                );
+              }
+            },
+            // Show info icon only if there's something to show info about
+            child: Icon(
+              Icons.info_outline,
+              color:
+                  popupToShow != null ? Colors.black54 : Colors.grey.shade300,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              infoText,
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              overflow: TextOverflow.ellipsis, // Prevent overflow
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- NEW Helper Widget to Display Orders ---
+  // Method now belongs to _GameGridScreenState, uses `ref` directly
+  Widget _buildOrderDisplay() {
+    final orders = ref.watch(orderProvider); // Use `ref` from State
+
+    if (orders.isEmpty) {
+      return const SizedBox(
+        height: 80,
+        child: Center(
+          child: Text(
+            "No active orders.",
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+    }
+
+    // Display only the first order for simplicity, matching the new design
+    final order = orders.first;
+    // Placeholder for reward text (assuming coins)
+    final rewardText = '+${order.rewardCoins}'; // Corrected interpolation
+
+    return Container(
+      height: 80,
+      color: Colors.black.withOpacity(0.2),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center, // Center the content
+        children: [
+          // Placeholder for NPC CircleAvatar
+          const CircleAvatar(
+            backgroundColor: Colors.brown, // Placeholder color
+            radius: 30,
+            child: Text(
+              '🧑',
+              style: TextStyle(fontSize: 30),
+            ), // Placeholder icon
+          ),
+          const SizedBox(width: 8), // Adjusted spacing
+          ElevatedButton(
+            onPressed: () {
+              ref
+                  .read(orderProvider.notifier)
+                  .attemptDelivery(order); // Use `ref` from State
+            },
+            style: ElevatedButton.styleFrom(
+              shape: const StadiumBorder(),
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text('GO', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(width: 8), // Adjusted spacing
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                rewardText,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.yellowAccent, // Highlight reward
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Placeholder for Item Image
+              SizedBox(
+                width: 35,
+                height: 35,
+                child: _buildTileContent(
+                  order.requiredItemId,
+                  size: 30,
+                ), // Call helper directly
+              ),
+              // Text( // Optional: Show required count if needed
+              //   'x ${order.requiredCount}',
+              //   style: const TextStyle(color: Colors.white70, fontSize: 10),
+              // ),
+            ],
           ),
         ],
       ),
@@ -423,9 +576,11 @@ class GameGridScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  // Correct build signature for State
+  Widget build(BuildContext context) {
     // Get screen size for potential adjustments
     // final screenSize = MediaQuery.of(context).size;
+    // `ref` is now accessed directly as a property of ConsumerState
 
     return Scaffold(
       // Remove AppBar
@@ -435,8 +590,7 @@ class GameGridScreen extends ConsumerWidget {
         // Use Column for layout
         children: [
           // --- Top Area (Status Bar + Level) ---
-          _buildTopArea(context, ref),
-
+          _buildTopArea(), // Call helper directly
           // --- Debug Buttons (Optional, keep for now) ---
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -486,7 +640,7 @@ class GameGridScreen extends ConsumerWidget {
             ],
           ),
           // --- Order Display Area ---
-          _buildOrderDisplay(context, ref), // Corrected call
+          _buildOrderDisplay(), // Call helper directly
           // --- Game Grid ---
           Expanded(
             // Grid takes remaining space
@@ -501,12 +655,12 @@ class GameGridScreen extends ConsumerWidget {
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: grid.colCount,
                     childAspectRatio: 1.0, // Keep square tiles
-                    mainAxisSpacing: 2.0, // Spacing between rows
-                    crossAxisSpacing: 2.0, // Spacing between columns
+                    mainAxisSpacing: 1.0, // Spacing between rows
+                    crossAxisSpacing: 1.0, // Spacing between columns
                   ),
-                  itemBuilder: (BuildContext context, int index) {
-                    // Corrected signature
-                    return _buildTile(context, ref, index);
+                  itemBuilder: (context, index) {
+                    // Context is implicitly available
+                    return _buildTile(index); // Call helper directly
                   },
                 ),
               ),
@@ -514,7 +668,7 @@ class GameGridScreen extends ConsumerWidget {
           ),
 
           // --- Bottom Info Bar ---
-          _buildBottomInfoBar(), // Use new bottom bar
+          _buildBottomInfoBar(), // Call helper directly
         ],
       ),
       // --- Floating Action Buttons ---
@@ -593,83 +747,4 @@ class GameGridScreen extends ConsumerWidget {
       ),
     );
   }
-
-  // --- NEW Helper Widget to Display Orders ---
-  Widget _buildOrderDisplay(BuildContext context, WidgetRef ref) {
-    final orders = ref.watch(orderProvider);
-
-    if (orders.isEmpty) {
-      return const SizedBox(
-        height: 80,
-        child: Center(
-          child: Text(
-            "No active orders.",
-            style: TextStyle(color: Colors.white70),
-          ),
-        ),
-      );
-    }
-
-    // Display only the first order for simplicity, matching the new design
-    final order = orders.first;
-    // Placeholder for reward text (assuming coins)
-    final rewardText = '+${order.rewardCoins}'; // Corrected interpolation
-
-    return Container(
-      height: 80,
-      color: Colors.black.withOpacity(0.2),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center, // Center the content
-        children: [
-          // Placeholder for NPC CircleAvatar
-          const CircleAvatar(
-            backgroundColor: Colors.brown, // Placeholder color
-            radius: 30,
-            child: Text(
-              '🧑',
-              style: TextStyle(fontSize: 30),
-            ), // Placeholder icon
-          ),
-          const SizedBox(width: 8), // Adjusted spacing
-          ElevatedButton(
-            onPressed: () {
-              ref.read(orderProvider.notifier).attemptDelivery(order);
-            },
-            style: ElevatedButton.styleFrom(
-              shape: const StadiumBorder(),
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
-            child: const Text('GO', style: TextStyle(fontSize: 16)),
-          ),
-          const SizedBox(width: 8), // Adjusted spacing
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                rewardText,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.yellowAccent, // Highlight reward
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 4),
-              // Placeholder for Item Image
-              SizedBox(
-                width: 35,
-                height: 35,
-                child: _buildTileContent(order.requiredItemId, size: 30),
-              ),
-              // Text( // Optional: Show required count if needed
-              //   'x ${order.requiredCount}',
-              //   style: const TextStyle(color: Colors.white70, fontSize: 10),
-              // ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
+} // End of _GameGridScreenState class
