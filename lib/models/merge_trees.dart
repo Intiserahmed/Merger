@@ -1,4 +1,6 @@
 // lib/models/merge_trees.dart
+import 'package:merger/models/generator_config.dart';
+
 import 'merge_item.dart'; // Import MergeItem
 
 // Defines the sequence of items for each merge tree.
@@ -17,17 +19,21 @@ final Map<String, List<String>> mergeTrees = {
   // Add other sequences here, e.g., 'shell', 'sword' if they have multiple levels
 };
 
-// --- Map of all merge items keyed by their emoji ---
-// TODO: Populate this map with all items from all sequences
+/// Build a MergeItem for each emoji in every sequence
 final Map<String, MergeItem> mergeItemsByEmoji = {
-  '🐚': const MergeItem(
-    id: 'pebble_3', // Assuming seashell is level 3 of pebble sequence
-    emoji: '🐚',
-    level: 3,
-    generatorEmoji: '⛏️', // Assuming pebbles come from the mine
-    sequenceId: 'pebble',
-  ),
-  // Add all other items here...
+  for (final entry in mergeTrees.entries) // each sequence
+    for (var i = 0; i < entry.value.length; i++) // each emoji in it
+      entry.value[i]: MergeItem(
+        id: '${entry.key}_${i + 1}', // e.g. "pebble_1"
+        emoji: entry.value[i],
+        level: i + 1,
+        sequenceId: entry.key,
+        generatorEmoji:
+            generatorConfigs
+                .entries // find which generator produces this sequence
+                .firstWhere((e) => e.value.sequenceId == entry.key)
+                .key,
+      ),
 };
 
 /// Finds the next item in a merge sequence.

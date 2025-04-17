@@ -26,22 +26,82 @@ class MergeItem {
 // }
 
 // Example usage for plant sequence (Illustrative - actual data will be centralized)
-// final List<MergeItem> plantItems = [
-//   MergeItem(
-//     id: 'plant_1',
-//     emoji: '🌱',
-//     level: 1,
-//     generatorEmoji: '🏕', // camp emoji
-//     sequenceId: 'plant',
-//     imagePath: 'assets/items/plant_1.png',
-//   ),
-//   MergeItem(
-//     id: 'plant_2',
-//     emoji: '🌿',
-//     level: 2,
-//     generatorEmoji: '🏕',
-//     sequenceId: 'plant',
-//     imagePath: 'assets/items/plant_2.png',
-//   ),
-//   // ...continue for higher levels
-// ];
+
+final List<MergeItem> plantItems = [
+  MergeItem(
+    id: 'plant_1',
+    emoji: '🌱',
+    level: 1,
+    generatorEmoji: '🏕', // camp emoji
+    sequenceId: 'plant',
+    imagePath: 'assets/items/plant_1.png',
+  ),
+  MergeItem(
+    id: 'plant_2',
+    emoji: '🌿',
+    level: 2,
+    generatorEmoji: '🏕',
+    sequenceId: 'plant',
+    imagePath: 'assets/items/plant_2.png',
+  ),
+  MergeItem(
+    id: 'plant_3',
+    emoji: '🌳',
+    level: 3,
+    generatorEmoji: '🏕',
+    sequenceId: 'plant',
+    imagePath: 'assets/items/plant_3.png',
+  ),
+];
+final List<MergeItem> toolItems = [
+  MergeItem(
+    id: 'tool_1',
+    emoji: '🔧',
+    level: 1,
+    generatorEmoji: '🏭', // factory emoji
+    sequenceId: 'tool',
+    imagePath: 'assets/items/tool_1.png',
+  ),
+  MergeItem(
+    id: 'tool_2',
+    emoji: '🔨',
+    level: 2,
+    generatorEmoji: '🏭',
+    sequenceId: 'tool',
+    imagePath: 'assets/items/tool_2.png',
+  ),
+  MergeItem(
+    id: 'tool_3',
+    emoji: '🔩',
+    level: 3,
+    generatorEmoji: '🏭',
+    sequenceId: 'tool',
+    imagePath: 'assets/items/tool_3.png',
+  ),
+];
+final List<MergeItem> pebbleItems = [
+  MergeItem(
+    id: 'pebble_1',
+    emoji: '🪨',
+    level: 1,
+    generatorEmoji: '⛏️', // mine emoji
+    sequenceId: 'pebble',
+    imagePath: 'assets/items/pebble_1.png',
+  ),
+  MergeItem(
+    id: 'pebble_2',
+    emoji: '🪵',
+    level: 2,
+    generatorEmoji: '⛏️',
+    sequenceId: 'pebble',
+    imagePath: 'assets/items/pebble_2.png',
+  ),
+  MergeItem(
+    id: 'pebble_3',
+    emoji: '🐚',
+    level: 3,
+    generatorEmoji: '⛏️',
+    sequenceId: 'pebble',
+    imagePath: 'assets/items/pebble_3.png',
+  ),
+];
