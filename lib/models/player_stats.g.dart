@@ -22,33 +22,43 @@ const PlayerStatsSchema = CollectionSchema(
       name: r'coins',
       type: IsarType.long,
     ),
-    r'energy': PropertySchema(
+    r'completedOrders': PropertySchema(
       id: 1,
+      name: r'completedOrders',
+      type: IsarType.long,
+    ),
+    r'energy': PropertySchema(
+      id: 2,
       name: r'energy',
       type: IsarType.long,
     ),
     r'gems': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'gems',
       type: IsarType.long,
     ),
     r'level': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'level',
       type: IsarType.long,
     ),
     r'maxEnergy': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'maxEnergy',
       type: IsarType.long,
     ),
+    r'ordersForNextLevel': PropertySchema(
+      id: 6,
+      name: r'ordersForNextLevel',
+      type: IsarType.long,
+    ),
     r'unlockedZoneIds': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'unlockedZoneIds',
       type: IsarType.stringList,
     ),
     r'xp': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'xp',
       type: IsarType.long,
     )
@@ -90,12 +100,14 @@ void _playerStatsSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeLong(offsets[0], object.coins);
-  writer.writeLong(offsets[1], object.energy);
-  writer.writeLong(offsets[2], object.gems);
-  writer.writeLong(offsets[3], object.level);
-  writer.writeLong(offsets[4], object.maxEnergy);
-  writer.writeStringList(offsets[5], object.unlockedZoneIds);
-  writer.writeLong(offsets[6], object.xp);
+  writer.writeLong(offsets[1], object.completedOrders);
+  writer.writeLong(offsets[2], object.energy);
+  writer.writeLong(offsets[3], object.gems);
+  writer.writeLong(offsets[4], object.level);
+  writer.writeLong(offsets[5], object.maxEnergy);
+  writer.writeLong(offsets[6], object.ordersForNextLevel);
+  writer.writeStringList(offsets[7], object.unlockedZoneIds);
+  writer.writeLong(offsets[8], object.xp);
 }
 
 PlayerStats _playerStatsDeserialize(
@@ -106,14 +118,16 @@ PlayerStats _playerStatsDeserialize(
 ) {
   final object = PlayerStats(
     coins: reader.readLongOrNull(offsets[0]) ?? 50,
-    energy: reader.readLongOrNull(offsets[1]) ?? 100,
-    gems: reader.readLongOrNull(offsets[2]) ?? 20,
-    level: reader.readLongOrNull(offsets[3]) ?? 1,
-    maxEnergy: reader.readLongOrNull(offsets[4]) ?? 100,
-    xp: reader.readLongOrNull(offsets[6]) ?? 0,
+    completedOrders: reader.readLongOrNull(offsets[1]) ?? 0,
+    energy: reader.readLongOrNull(offsets[2]) ?? 100,
+    gems: reader.readLongOrNull(offsets[3]) ?? 20,
+    level: reader.readLongOrNull(offsets[4]) ?? 1,
+    maxEnergy: reader.readLongOrNull(offsets[5]) ?? 100,
+    ordersForNextLevel: reader.readLongOrNull(offsets[6]) ?? 3,
+    xp: reader.readLongOrNull(offsets[8]) ?? 0,
   );
   object.id = id;
-  object.unlockedZoneIds = reader.readStringList(offsets[5]) ?? [];
+  object.unlockedZoneIds = reader.readStringList(offsets[7]) ?? [];
   return object;
 }
 
@@ -127,16 +141,20 @@ P _playerStatsDeserializeProp<P>(
     case 0:
       return (reader.readLongOrNull(offset) ?? 50) as P;
     case 1:
-      return (reader.readLongOrNull(offset) ?? 100) as P;
+      return (reader.readLongOrNull(offset) ?? 0) as P;
     case 2:
-      return (reader.readLongOrNull(offset) ?? 20) as P;
-    case 3:
-      return (reader.readLongOrNull(offset) ?? 1) as P;
-    case 4:
       return (reader.readLongOrNull(offset) ?? 100) as P;
+    case 3:
+      return (reader.readLongOrNull(offset) ?? 20) as P;
+    case 4:
+      return (reader.readLongOrNull(offset) ?? 1) as P;
     case 5:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readLongOrNull(offset) ?? 100) as P;
     case 6:
+      return (reader.readLongOrNull(offset) ?? 3) as P;
+    case 7:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 8:
       return (reader.readLongOrNull(offset) ?? 0) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -282,6 +300,62 @@ extension PlayerStatsQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'coins',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      completedOrdersEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'completedOrders',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      completedOrdersGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'completedOrders',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      completedOrdersLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'completedOrders',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      completedOrdersBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'completedOrders',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -552,6 +626,62 @@ extension PlayerStatsQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'maxEnergy',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      ordersForNextLevelEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ordersForNextLevel',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      ordersForNextLevelGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ordersForNextLevel',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      ordersForNextLevelLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ordersForNextLevel',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterFilterCondition>
+      ordersForNextLevelBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ordersForNextLevel',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -861,6 +991,19 @@ extension PlayerStatsQuerySortBy
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByCompletedOrders() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completedOrders', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy>
+      sortByCompletedOrdersDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completedOrders', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByEnergy() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'energy', Sort.asc);
@@ -909,6 +1052,20 @@ extension PlayerStatsQuerySortBy
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy>
+      sortByOrdersForNextLevel() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ordersForNextLevel', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy>
+      sortByOrdersForNextLevelDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ordersForNextLevel', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> sortByXp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'xp', Sort.asc);
@@ -933,6 +1090,19 @@ extension PlayerStatsQuerySortThenBy
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByCoinsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'coins', Sort.desc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByCompletedOrders() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completedOrders', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy>
+      thenByCompletedOrdersDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completedOrders', Sort.desc);
     });
   }
 
@@ -996,6 +1166,20 @@ extension PlayerStatsQuerySortThenBy
     });
   }
 
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy>
+      thenByOrdersForNextLevel() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ordersForNextLevel', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy>
+      thenByOrdersForNextLevelDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ordersForNextLevel', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlayerStats, PlayerStats, QAfterSortBy> thenByXp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'xp', Sort.asc);
@@ -1014,6 +1198,13 @@ extension PlayerStatsQueryWhereDistinct
   QueryBuilder<PlayerStats, PlayerStats, QDistinct> distinctByCoins() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'coins');
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QDistinct>
+      distinctByCompletedOrders() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'completedOrders');
     });
   }
 
@@ -1038,6 +1229,13 @@ extension PlayerStatsQueryWhereDistinct
   QueryBuilder<PlayerStats, PlayerStats, QDistinct> distinctByMaxEnergy() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'maxEnergy');
+    });
+  }
+
+  QueryBuilder<PlayerStats, PlayerStats, QDistinct>
+      distinctByOrdersForNextLevel() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ordersForNextLevel');
     });
   }
 
@@ -1069,6 +1267,12 @@ extension PlayerStatsQueryProperty
     });
   }
 
+  QueryBuilder<PlayerStats, int, QQueryOperations> completedOrdersProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'completedOrders');
+    });
+  }
+
   QueryBuilder<PlayerStats, int, QQueryOperations> energyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'energy');
@@ -1090,6 +1294,13 @@ extension PlayerStatsQueryProperty
   QueryBuilder<PlayerStats, int, QQueryOperations> maxEnergyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'maxEnergy');
+    });
+  }
+
+  QueryBuilder<PlayerStats, int, QQueryOperations>
+      ordersForNextLevelProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ordersForNextLevel');
     });
   }
 

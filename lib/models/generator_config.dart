@@ -32,8 +32,12 @@ final Map<String, GeneratorConfig> generatorConfigs = {
     cooldown: 10,
     energyCost: 2,
   ), // Camp for Plant sequence
-  // Add other generators here, e.g., a Mine for coins?
-  // '⛏️': GeneratorConfig(sequenceId: 'coin', cooldown: 30, energyCost: 1), // Example if Mine generates coins directly
+  '⛏️': GeneratorConfig(
+    sequenceId: 'pebble', // Mine generates pebbles
+    cooldown: 20, // Cooldown similar to Bucket
+    energyCost: 5, // Energy cost similar to Bucket
+  ), // Mine for Pebble sequence
+  // Add other generators here
 };
 
 // Helper to potentially get the base item emoji for a generator

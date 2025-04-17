@@ -4,9 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/player_stats.dart'; // Import the model
 import '../models/tile_unlock.dart'; // Import TileUnlock for the new method
 import 'expansion_provider.dart'; // Import expansion provider
-// import 'grid_provider.dart'; // Import grid provider if needed for tile updates
 
-// Individual providers for simple stats (easy to watch individually)
+// Individual providers for simple stats (easy to watch individually) - Keeping for now
 // Consider removing these if PlayerStatsNotifier is the primary way to manage stats
 final energyProvider = StateProvider<int>((ref) => 100); // Initial energy
 final coinsProvider = StateProvider<int>((ref) => 50); // Initial coins
@@ -16,18 +15,32 @@ final playerLevelProvider = StateProvider<int>((ref) => 1); // Initial Level
 
 // --- OR ---
 
-// Define energy cost for spawning an item
-const int spawnEnergyCost =
-    10; // Keep this if used elsewhere, otherwise can be removed if generators have costs
+// Define energy cost for spawning an item - Removing as spawn button will be removed
+// const int spawnEnergyCost = 10;
+
+// --- Define total orders needed to reach each level ---
+const Map<int, int> _totalOrdersPerLevel = {
+  2: 3, // Need 3 total orders to reach level 2
+  3: 8, // Need 8 total orders to reach level 3 (5 more)
+  4: 15, // Need 15 total orders to reach level 4 (7 more)
+  5: 25, // Need 25 total orders to reach level 5 (10 more)
+  6: 40, // Need 40 total orders to reach level 6 (15 more) - Max level 5 for now
+  // Add more levels as needed
+};
 
 // A single Notifier for the whole PlayerStats object (better if stats often change together)
 class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
-  final Ref ref; // Inject Ref
-  Timer? _energyRegenTimer; // Timer for energy regeneration
+  final Ref ref;
+  Timer? _energyRegenTimer;
 
   // Initialize with a non-const PlayerStats instance and start the timer
-  PlayerStatsNotifier(this.ref) : super(PlayerStats()) {
-    // Initial default stats
+  PlayerStatsNotifier(this.ref)
+    : super(
+        PlayerStats(
+          // Initialize ordersForNextLevel for level 1 -> 2
+          ordersForNextLevel: _totalOrdersPerLevel[2] ?? 3,
+        ),
+      ) {
     _startEnergyRegeneration();
   }
 
@@ -68,35 +81,16 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
     // Create a new state object
     state = PlayerStats(
       level: state.level,
-      xp: state.xp + amount, // Update XP
+      xp: state.xp + amount, // Update XP - Keep XP tracking separate for now
       coins: state.coins,
-      gems: state.gems, // Include gems
+      gems: state.gems,
       energy: state.energy,
       maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
+      initialUnlockedZoneIds: state.unlockedZoneIds,
+      completedOrders: state.completedOrders, // Keep existing order count
+      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
     );
-    // Add level up logic here later (Milestone 3)
-    // TODO: Implement level up check based on XP thresholds
-    _checkLevelUp(); // Check for level up after adding XP
-  }
-
-  /// Checks if the current XP meets the threshold for the next level.
-  void _checkLevelUp() {
-    final currentLevel = state.level;
-    final currentXp = state.xp;
-    final xpNeeded = getXpNeededForNextLevel(currentLevel);
-
-    // Use cumulative XP for checking against total XP
-    final totalXpNeededForNextLevel = getTotalXpForLevel(currentLevel + 1);
-
-    // Check if current XP meets the requirement for the *next* level
-    if (currentXp >= totalXpNeededForNextLevel) {
-      // Potentially handle multiple level ups in one go if a large amount of XP is gained
-      // For simplicity, we'll just do one level up at a time for now.
-      levelUp();
-      // Optional: Recursively call _checkLevelUp() again if player might gain multiple levels at once
-      // _checkLevelUp();
-    }
+    // _checkLevelUp(); // Remove XP-based level up check
   }
 
   /// Attempts to spend energy. Returns true if successful, false otherwise.
@@ -133,12 +127,14 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level,
       xp: state.xp,
       coins: state.coins,
-      gems: state.gems, // Include gems
+      gems: state.gems,
       energy: newEnergy, // Update energy
       maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
+      initialUnlockedZoneIds: state.unlockedZoneIds,
+      completedOrders: state.completedOrders, // Keep existing order count
+      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
     );
-    // Consider restarting the timer here if it was stopped when full and energy was added below max
+    // Consider restarting the timer here if it was stopped when full
     // if (newEnergy < state.maxEnergy) _startEnergyRegeneration();
   }
 
@@ -148,11 +144,45 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level,
       xp: state.xp,
       coins: state.coins + amount, // Update coins
-      gems: state.gems, // Include gems
+      gems: state.gems,
       energy: state.energy,
       maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
+      initialUnlockedZoneIds: state.unlockedZoneIds,
+      completedOrders: state.completedOrders, // Keep existing order count
+      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
     );
+  }
+
+  // --- NEW: Method called when an order is successfully completed ---
+  void orderCompleted() {
+    final newCompletedOrders = state.completedOrders + 1;
+    state = PlayerStats(
+      level: state.level,
+      xp: state.xp, // Keep XP separate
+      coins: state.coins, // Rewards are added separately by OrderNotifier
+      gems: state.gems,
+      energy: state.energy,
+      maxEnergy: state.maxEnergy,
+      initialUnlockedZoneIds: state.unlockedZoneIds,
+      completedOrders: newCompletedOrders, // Increment completed orders
+      ordersForNextLevel: state.ordersForNextLevel, // Keep target for now
+    );
+    _checkLevelUp(); // Check if this completion triggers a level up
+  }
+
+  /// Checks if the completed orders meet the threshold for the next level.
+  void _checkLevelUp() {
+    // Check if player has completed enough orders for the *next* level
+    if (state.completedOrders >= state.ordersForNextLevel) {
+      // Check if there's a defined next level target
+      if (_totalOrdersPerLevel.containsKey(state.level + 1)) {
+        levelUp();
+        // Optional: Recursively call _checkLevelUp() if multiple levels might be gained
+        // _checkLevelUp();
+      } else {
+        print("Max level reached (based on defined orders per level).");
+      }
+    }
   }
 
   void spendCoins(int amount) {
@@ -162,10 +192,12 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
         level: state.level,
         xp: state.xp,
         coins: state.coins - amount, // Update coins
-        gems: state.gems, // Include gems
+        gems: state.gems,
         energy: state.energy,
         maxEnergy: state.maxEnergy,
-        initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
+        initialUnlockedZoneIds: state.unlockedZoneIds,
+        completedOrders: state.completedOrders, // Keep existing order count
+        ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
       );
     } else {
       print("Not enough coins!");
@@ -173,21 +205,28 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
     }
   }
 
+  // Modified levelUp for order-based progression
   void levelUp() {
-    // Example level up logic
-    // Create a new state object
+    final nextLevel = state.level + 1;
+    // Get the total orders needed for the level *after* the next one, or a high number if max level
+    final ordersForLevelAfterNext =
+        _totalOrdersPerLevel[nextLevel + 1] ?? 999999;
+
     state = PlayerStats(
-      level: state.level + 1, // Update level
-      xp: 0, // Reset XP on level up? Consider carrying over excess XP
+      level: nextLevel, // Update level
+      xp: state.xp, // Keep XP as is
       coins: state.coins,
-      gems: state.gems, // Include gems
+      gems: state.gems,
       // Increase max energy and refill current energy to the new max
       maxEnergy: state.maxEnergy + 10, // Increase max energy by 10
       energy: state.maxEnergy + 10, // Refill energy to the new max
-      initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
+      initialUnlockedZoneIds: state.unlockedZoneIds,
+      completedOrders: state.completedOrders, // Keep total completed orders
+      // Set the target for the *next* level up
+      ordersForNextLevel: ordersForLevelAfterNext,
     );
     print(
-      "Level Up! Reached level ${state.level}. Max energy increased to ${state.maxEnergy}.",
+      "Level Up! Reached level ${state.level}. Max energy increased to ${state.maxEnergy}. Next level at ${state.ordersForNextLevel} total orders.",
     );
     // Consider restarting the timer here if it was stopped when full
     // _startEnergyRegeneration(); // If implementing stop-when-full logic
@@ -201,13 +240,15 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: loadedStats.level,
       xp: loadedStats.xp,
       coins: loadedStats.coins,
-      gems: loadedStats.gems, // Load gems
+      gems: loadedStats.gems,
       energy: loadedStats.energy,
       maxEnergy: loadedStats.maxEnergy,
-      // Load unlocked zones as well
       initialUnlockedZoneIds: loadedStats.unlockedZoneIds,
+      // Load order progress
+      completedOrders: loadedStats.completedOrders,
+      ordersForNextLevel: loadedStats.ordersForNextLevel,
     );
-    // Ensure timer restarts if loading changes energy state significantly
+    // Ensure timer restarts
     _startEnergyRegeneration();
   }
 
@@ -244,13 +285,15 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       level: state.level,
       xp: state.xp,
       coins: state.coins, // Coins already spent by spendCoins call
-      gems: state.gems, // Include gems
+      gems: state.gems,
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: newUnlockedIds, // Assign the updated list
+      completedOrders: state.completedOrders, // Keep existing order count
+      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
     );
 
-    // 4. Optional: Update Grid Tiles (if zone defines specific tiles)
+    // 4. Optional: Update Grid Tiles
     // This might be better handled by watching unlockedStatusProvider in GridProvider
     // or by passing the gridNotifier reference here.
     // Example (if gridNotifier was passed or read):
@@ -273,6 +316,8 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds,
+      completedOrders: state.completedOrders, // Keep existing order count
+      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
     );
   }
 
@@ -286,6 +331,8 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
         energy: state.energy,
         maxEnergy: state.maxEnergy,
         initialUnlockedZoneIds: state.unlockedZoneIds,
+        completedOrders: state.completedOrders, // Keep existing order count
+        ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
       );
       return true;
     } else {
@@ -301,30 +348,6 @@ final playerStatsProvider =
       return PlayerStatsNotifier(ref);
     });
 
-// Choose EITHER individual providers OR the combined Notifier based on preference.
 // The Notifier is generally better for related state and logic encapsulation.
 
-// --- XP Thresholds for Leveling Up ---
-// Example: Level 2 needs 100 XP, Level 3 needs 250 more (total 350), etc.
-const Map<int, int> xpPerLevel = {
-  1: 100, // XP needed to reach level 2
-  2: 250, // Additional XP needed to reach level 3 (current XP must be >= 100 + 250)
-  3: 500, // Additional XP needed to reach level 4 (current XP must be >= 100 + 250 + 500)
-  // Add more levels as needed
-};
-
-// Helper to get total XP required for a given level
-int getTotalXpForLevel(int level) {
-  int totalXp = 0;
-  // Calculate cumulative XP needed for the *start* of the target level
-  for (int i = 1; i < level; i++) {
-    totalXp += xpPerLevel[i] ?? 0;
-  }
-  return totalXp;
-}
-
-// Helper to get XP needed for the *next* level from the current level's base
-int getXpNeededForNextLevel(int currentLevel) {
-  return xpPerLevel[currentLevel] ??
-      999999; // Return a large number if level cap reached
-}
+// --- Removed XP Threshold Helpers ---

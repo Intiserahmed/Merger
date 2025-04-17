@@ -16,6 +16,10 @@ class PlayerStats {
   int maxEnergy; // Maximum energy capacity
   List<String> unlockedZoneIds; // Store IDs of unlocked zones
 
+  // --- New fields for order-based leveling ---
+  int completedOrders; // Total orders completed
+  int ordersForNextLevel; // Orders needed to reach the next level
+
   // Constructor with default values
   PlayerStats({
     this.level = 1,
@@ -25,6 +29,8 @@ class PlayerStats {
     this.energy = 100,
     this.maxEnergy = 100, // Default max energy
     List<String>? initialUnlockedZoneIds, // Make it optional
+    this.completedOrders = 0, // Start with 0 completed orders
+    this.ordersForNextLevel = 3, // Example: Need 3 orders for level 2
   }) : unlockedZoneIds =
            initialUnlockedZoneIds ?? []; // Initialize to empty list if null
 

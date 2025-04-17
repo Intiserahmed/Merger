@@ -79,7 +79,63 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         // (Keep the existing layout logic for unlocked tiles, but remove numbered items)
         // Add row/col to all TileData instantiations
 
-        // Example: Keep some specific items if needed
+        // --- Place Initial Generators ---
+        const String campEmoji = '🏕️';
+        const String mineEmoji = '⛏️'; // Re-declare here for clarity if needed
+        const String workshopEmoji = '🏭';
+
+        if (row == 4 && col == 1) {
+          // Camp Location
+          final config = generatorConfigs[campEmoji];
+          if (config != null) {
+            return TileData(
+              row: row,
+              col: col,
+              type: TileType.generator,
+              baseImagePath: campEmoji,
+              generatesItemPath:
+                  mergeTrees[config.sequenceId]?.first, // Get base item
+              cooldownSeconds: config.cooldown,
+              energyCost: config.energyCost,
+            );
+          }
+        }
+        if (row == 4 && col == 3) {
+          // Mine Location
+          final config = generatorConfigs[mineEmoji];
+          if (config != null) {
+            return TileData(
+              row: row,
+              col: col,
+              type: TileType.generator,
+              baseImagePath: mineEmoji,
+              generatesItemPath:
+                  mergeTrees[config.sequenceId]?.first, // Get base item
+              cooldownSeconds: config.cooldown,
+              energyCost: config.energyCost,
+            );
+          }
+          // Fallback if config is missing (e.g., direct coin generation)
+          // else if (mineEmoji == '⛏️') { ... handle coin mine ... }
+        }
+        if (row == 4 && col == 5) {
+          // Workshop Location
+          final config = generatorConfigs[workshopEmoji];
+          if (config != null) {
+            return TileData(
+              row: row,
+              col: col,
+              type: TileType.generator,
+              baseImagePath: workshopEmoji,
+              generatesItemPath:
+                  mergeTrees[config.sequenceId]?.first, // Get base item
+              cooldownSeconds: config.cooldown,
+              energyCost: config.energyCost,
+            );
+          }
+        }
+
+        // --- Existing Specific Items (Ensure they don't conflict with generators) ---
         if (row == 3 && col == 2)
           return TileData(
             row: row,
@@ -96,7 +152,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
-        if (row == 4 && col == 2)
+        // Removed item at 4,1 (Camp)
+        if (row == 4 && col == 2) // Keep item next to Camp
           return TileData(
             row: row,
             col: col,
@@ -104,15 +161,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             baseImagePath: sand,
             itemImagePath: sword,
           ); // Sword item
-        if (row == 4 && col == 3)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            itemImagePath: star,
-          ); // Star item
-        if (row == 4 && col == 4)
+        // Removed item at 4,3 (Mine)
+        if (row == 4 && col == 4) // Keep item next to Mine
           return TileData(
             row: row,
             col: col,
@@ -120,7 +170,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             baseImagePath: sand,
             itemImagePath: castle,
           ); // Castle item
-        if (row == 5 && col == 1)
+        // Removed item at 4,5 (Workshop)
+        if (row == 5 && col == 1) // Keep item below Camp
           return TileData(
             row: row,
             col: col,
@@ -472,24 +523,12 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     // --- Refactored Generator Placement using Config ---
     final config = generatorConfigs[generatorEmoji];
     if (config == null) {
-      // Special case: Handle Mine if it generates coins directly (not via sequence)
-      if (generatorEmoji == mineEmoji) {
-        final mineData = TileData(
-          row: row,
-          col: col,
-          type: TileType.generator,
-          baseImagePath: generatorEmoji,
-          generatesItemPath: coinEmoji, // Directly generates coins
-          cooldownSeconds: 30, // Example cooldown for mine
-          energyCost: 1, // Example energy cost for mine
-        );
-        updateTile(row, col, mineData);
-        print("Placed Coin Mine generator at ($row, $col).");
-        return;
-      } else {
-        print("Unknown generator type or missing config: $generatorEmoji");
-        return; // Don't place anything if unknown or no config
-      }
+      // If config is missing, print error and do nothing.
+      // Removed the fallback logic that incorrectly made the Mine generate coins.
+      print(
+        "Generator config missing for: $generatorEmoji. Cannot place generator.",
+      );
+      return;
     }
 
     // Find the base item for the sequence
@@ -535,11 +574,12 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       print("Tile at ($row, $col) is not a generator.");
       return;
     }
-    if (!generatorTile.isReady) {
-      print("Generator at ($row, $col) is on cooldown.");
-      // Optional: Show feedback to user (e.g., SnackBar)
-      return;
-    }
+    // --- Temporarily removing cooldown check as requested ---
+    // if (!generatorTile.isReady) {
+    //   print("Generator at ($row, $col) is on cooldown.");
+    //   // Optional: Show feedback to user (e.g., SnackBar)
+    //   return;
+    // }
     if (generatorTile.generatesItemPath == null) {
       print("Generator at ($row, $col) has nothing defined to generate.");
       return;

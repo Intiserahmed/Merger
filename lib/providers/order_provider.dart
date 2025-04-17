@@ -7,57 +7,202 @@ import '../models/tile_data.dart'; // Need TileData
 import 'grid_provider.dart'; // Need GridProvider
 import 'player_provider.dart'; // Need PlayerStatsProvider
 
-// --- Possible Orders ---
-// Define a list of potential orders the game can generate
-final List<Order> _possibleOrders = [
-  Order(
-    id: 'order_star_1',
-    requiredItemId: '⭐',
-    requiredCount: 1,
-    rewardCoins: 50,
-    rewardXp: 10,
-  ),
-  Order(
-    id: 'order_shield_1',
-    requiredItemId: '🛡️',
-    requiredCount: 1,
-    rewardCoins: 100,
-    rewardXp: 25,
-  ),
-  Order(
-    id: 'order_star_3',
-    requiredItemId: '🌳',
-    requiredCount: 3,
-    rewardCoins: 200,
-    rewardXp: 50,
-  ),
-  Order(
-    id: 'order_sword_5', // Example: Order for base items
-    requiredItemId: '🌳',
-    requiredCount: 2,
-    rewardCoins: 400,
-    rewardXp: 5,
-  ),
-  // Add more diverse orders
-];
+// --- Level-Based Order Definitions ---
+// Define potential orders grouped by the player level they become available at.
+// Keep orders simple for early levels, using items from initial generators.
+final Map<int, List<Order>> _ordersByLevel = {
+  1: [
+    // Orders available at Level 1
+    Order(
+      id: 'lvl1_plant_1',
+      requiredItemId: '🌱',
+      requiredCount: 2,
+      rewardCoins: 10,
+      rewardXp: 5,
+    ),
+    Order(
+      id: 'lvl1_pebble_1',
+      requiredItemId: '🪨',
+      requiredCount: 2,
+      rewardCoins: 10,
+      rewardXp: 5,
+    ),
+    Order(
+      id: 'lvl1_tool_1',
+      requiredItemId: '🔧',
+      requiredCount: 1,
+      rewardCoins: 15,
+      rewardXp: 8,
+    ),
+  ],
+  2: [
+    // Orders available at Level 2 (includes Level 1 orders + new ones)
+    Order(
+      id: 'lvl2_plant_2',
+      requiredItemId: '🌿',
+      requiredCount: 1,
+      rewardCoins: 25,
+      rewardXp: 12,
+    ),
+    Order(
+      id: 'lvl2_pebble_2',
+      requiredItemId: '🪵',
+      requiredCount: 1,
+      rewardCoins: 25,
+      rewardXp: 12,
+    ),
+    Order(
+      id: 'lvl2_tool_2',
+      requiredItemId: '🔨',
+      requiredCount: 1,
+      rewardCoins: 35,
+      rewardXp: 18,
+    ),
+    Order(
+      id: 'lvl2_plant_1_many',
+      requiredItemId: '🌱',
+      requiredCount: 4,
+      rewardCoins: 20,
+      rewardXp: 10,
+    ), // More base items
+  ],
+  3: [
+    // Orders available at Level 3
+    Order(
+      id: 'lvl3_plant_3',
+      requiredItemId: '🌳',
+      requiredCount: 1,
+      rewardCoins: 50,
+      rewardXp: 25,
+    ),
+    Order(
+      id: 'lvl3_pebble_3',
+      requiredItemId: '🐚',
+      requiredCount: 1,
+      rewardCoins: 50,
+      rewardXp: 25,
+    ),
+    Order(
+      id: 'lvl3_tool_3',
+      requiredItemId: '🔩',
+      requiredCount: 1,
+      rewardCoins: 60,
+      rewardXp: 30,
+    ),
+    Order(
+      id: 'lvl3_plant_2_many',
+      requiredItemId: '🌿',
+      requiredCount: 2,
+      rewardCoins: 45,
+      rewardXp: 20,
+    ),
+  ],
+  4: [
+    // Orders available at Level 4
+    Order(
+      id: 'lvl4_plant_4',
+      requiredItemId: '🌲',
+      requiredCount: 1,
+      rewardCoins: 100,
+      rewardXp: 50,
+    ),
+    Order(
+      id: 'lvl4_pebble_4',
+      requiredItemId: '🐌',
+      requiredCount: 1,
+      rewardCoins: 100,
+      rewardXp: 50,
+    ),
+    Order(
+      id: 'lvl4_tool_4',
+      requiredItemId: '⚙️',
+      requiredCount: 1,
+      rewardCoins: 120,
+      rewardXp: 60,
+    ),
+    Order(
+      id: 'lvl4_plant_3_many',
+      requiredItemId: '🌳',
+      requiredCount: 2,
+      rewardCoins: 90,
+      rewardXp: 45,
+    ),
+  ],
+  5: [
+    // Orders available at Level 5
+    Order(
+      id: 'lvl5_tool_5',
+      requiredItemId: '🔗',
+      requiredCount: 1,
+      rewardCoins: 200,
+      rewardXp: 100,
+    ),
+    Order(
+      id: 'lvl5_plant_4_many',
+      requiredItemId: '🌲',
+      requiredCount: 2,
+      rewardCoins: 180,
+      rewardXp: 90,
+    ),
+    Order(
+      id: 'lvl5_pebble_4_many',
+      requiredItemId: '🐌',
+      requiredCount: 2,
+      rewardCoins: 180,
+      rewardXp: 90,
+    ),
+    // Add more complex/higher reward orders for level 5+
+  ],
+  // Add more levels as needed
+};
 
 class OrderNotifier extends StateNotifier<List<Order>> {
-  final Ref ref; // Inject Ref
+  final Ref ref;
 
-  OrderNotifier(this.ref)
-    : super(_generateInitialOrders(3)); // Start with 3 orders
+  OrderNotifier(this.ref) : super([]) {
+    // Generate initial orders based on starting level (1)
+    _generateInitialOrders(3);
 
-  // Generate a specified number of unique initial orders
-  static List<Order> _generateInitialOrders(int count) {
+    // Listen for level changes and potentially add new orders
+    ref.listen<int>(playerStatsProvider.select((stats) => stats.level), (
+      previousLevel,
+      newLevel,
+    ) {
+      print(
+        "[OrderNotifier] Detected level change from $previousLevel to $newLevel",
+      );
+      if (newLevel > (previousLevel ?? 0)) {
+        // Level up occurred, try to fill order slots with potentially new available orders
+        _fillOrderSlots();
+      }
+    });
+  }
+
+  // Generate initial orders based on the player's current level
+  void _generateInitialOrders(int count) {
+    final playerLevel = ref.read(playerStatsProvider).level;
+    final availableOrders = _getAvailableOrdersForLevel(playerLevel);
     final random = Random();
-    final availableOrders = List<Order>.from(_possibleOrders); // Copy the list
     final initialOrders = <Order>[];
 
     for (int i = 0; i < count && availableOrders.isNotEmpty; i++) {
       final randomIndex = random.nextInt(availableOrders.length);
       initialOrders.add(availableOrders.removeAt(randomIndex));
     }
-    return initialOrders;
+    state = initialOrders; // Set the initial state
+  }
+
+  // Helper to get all possible orders up to the player's current level
+  List<Order> _getAvailableOrdersForLevel(int playerLevel) {
+    final possibleOrders = <Order>[];
+    for (int level = 1; level <= playerLevel; level++) {
+      if (_ordersByLevel.containsKey(level)) {
+        possibleOrders.addAll(_ordersByLevel[level]!);
+      }
+    }
+    // Remove duplicates if orders are redefined at higher levels (optional, depends on design)
+    // For now, assumes orders are additive or unique IDs prevent issues.
+    return possibleOrders;
   }
 
   /// Attempts to deliver items for a specific order.
@@ -114,14 +259,19 @@ class OrderNotifier extends StateNotifier<List<Order>> {
 
       // 4. Grant Rewards
       playerNotifier.addCoins(orderToDeliver.rewardCoins);
-      playerNotifier.addXp(orderToDeliver.rewardXp);
+      // playerNotifier.addXp(orderToDeliver.rewardXp); // Keep XP separate for now
       print(
-        "Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins and ${orderToDeliver.rewardXp} XP.",
+        "Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins.", // Removed XP from log
       );
 
-      // 5. Remove the completed order and add a new one
+      // --- Notify PlayerStatsNotifier about completion ---
+      playerNotifier.orderCompleted();
+
+      // 5. Remove the completed order
       state = state.where((order) => order.id != orderToDeliver.id).toList();
-      _maybeAddNewOrder();
+
+      // 6. Add a new order immediately to replace the completed one
+      _maybeAddNewOrder(); // Tries to add one order using the current level pool
     } else {
       print(
         "Not enough items for order '${orderToDeliver.id}'. Found $foundCount, need ${orderToDeliver.requiredCount}.",
@@ -130,24 +280,84 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     }
   }
 
-  // Adds a new random order if the current number of orders is below a threshold
+  // Tries to add *one* new random order if slots are available, using the current level.
   void _maybeAddNewOrder() {
-    const int maxActiveOrders = 3; // Keep 3 active orders
+    const int maxActiveOrders = 3;
     if (state.length < maxActiveOrders) {
+      // Read the current level synchronously. This might be the old level if called
+      // immediately after completion, but the listener handles level-up cases.
+      final playerLevel = ref.read(playerStatsProvider).level;
+      print(
+        "[OrderNotifier] _maybeAddNewOrder: Trying to add. Current Level: $playerLevel",
+      );
+      final availableOrders = _getAvailableOrdersForLevel(playerLevel);
+      print(
+        "[OrderNotifier] _maybeAddNewOrder: Available for level $playerLevel (before filter): ${availableOrders.map((o) => o.id).toList()}",
+      );
       final random = Random();
-      final availableOrders = List<Order>.from(_possibleOrders);
-      // Remove orders already active
+
+      // Remove orders already active to avoid duplicates
       final activeOrderIds = state.map((o) => o.id).toSet();
       availableOrders.removeWhere((o) => activeOrderIds.contains(o.id));
+      print(
+        "[OrderNotifier] _maybeAddNewOrder: Available for level $playerLevel (after filter): ${availableOrders.map((o) => o.id).toList()}",
+      );
 
       if (availableOrders.isNotEmpty) {
         final randomIndex = random.nextInt(availableOrders.length);
         final newOrder = availableOrders[randomIndex];
-        state = [...state, newOrder]; // Add the new order to the list
-        print("Added new order: ${newOrder.id}");
+        state = [...state, newOrder];
+        print(
+          "[OrderNotifier] _maybeAddNewOrder: Added new order ${newOrder.id} for level $playerLevel",
+        );
       } else {
-        print("No more unique orders available to add.");
+        print(
+          "[OrderNotifier] _maybeAddNewOrder: No more unique orders available for level $playerLevel.",
+        );
       }
+    } else {
+      print(
+        "[OrderNotifier] _maybeAddNewOrder: Order slots full (${state.length}/$maxActiveOrders).",
+      );
+    }
+  }
+
+  // Fills empty order slots, typically called after a level up detected by the listener.
+  void _fillOrderSlots() {
+    const int maxActiveOrders = 3;
+    int ordersToAdd = maxActiveOrders - state.length;
+    print(
+      "[OrderNotifier] _fillOrderSlots: Current orders: ${state.length}, Need to add: $ordersToAdd",
+    );
+
+    if (ordersToAdd <= 0) return; // No slots to fill
+
+    final playerLevel =
+        ref.read(playerStatsProvider).level; // Read the latest level
+    print("[OrderNotifier] _fillOrderSlots: Filling for level $playerLevel");
+    final availableOrders = _getAvailableOrdersForLevel(playerLevel);
+    final random = Random();
+    final activeOrderIds = state.map((o) => o.id).toSet();
+    availableOrders.removeWhere((o) => activeOrderIds.contains(o.id));
+
+    final List<Order> newlyAddedOrders = [];
+    for (int i = 0; i < ordersToAdd && availableOrders.isNotEmpty; i++) {
+      final randomIndex = random.nextInt(availableOrders.length);
+      final newOrder = availableOrders.removeAt(
+        randomIndex,
+      ); // Remove to ensure uniqueness
+      newlyAddedOrders.add(newOrder);
+      print(
+        "[OrderNotifier] _fillOrderSlots: Adding new order ${newOrder.id} for level $playerLevel",
+      );
+    }
+
+    if (newlyAddedOrders.isNotEmpty) {
+      state = [...state, ...newlyAddedOrders];
+    } else {
+      print(
+        "[OrderNotifier] _fillOrderSlots: No more unique orders available for level $playerLevel.",
+      );
     }
   }
 }

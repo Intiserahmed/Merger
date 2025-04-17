@@ -676,64 +676,11 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
         // Use a Row to place buttons side-by-side
         mainAxisAlignment: MainAxisAlignment.end, // Align to the end
         children: [
-          // --- Spawn Button ---
-          FloatingActionButton.extended(
-            heroTag: 'spawnFabGrid', // Unique heroTag for Grid screen spawn
-            onPressed: () {
-              final playerNotifier = ref.read(playerStatsProvider.notifier);
-              final gridNotifier = ref.read(grid.gridProvider.notifier);
-              // Get spawn cost from the plant generator ('🏕️') config
-              final plantConfig = generatorConfigs['🏕️'];
-              final cost =
-                  plantConfig?.energyCost ?? 2; // Default if config missing
+          // --- Spawn Button Removed ---
 
-              final bool energySpent = playerNotifier.spendEnergy(cost);
-
-              if (energySpent) {
-                // Spawn the base plant item using mergeTrees
-                final basePlantItem = mergeTrees['plant']?.first;
-                if (basePlantItem != null) {
-                  final bool itemSpawned = gridNotifier.spawnItemOnFirstEmpty(
-                    basePlantItem,
-                  );
-
-                  if (!itemSpawned) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("No empty space to spawn an item!"),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                    playerNotifier.addEnergy(
-                      cost,
-                    ); // Refund only if spawn failed
-                  }
-                  // Don't refund if spawn succeeded
-                } else {
-                  print("Error: Base plant item not found in mergeTrees.");
-                  playerNotifier.addEnergy(
-                    cost,
-                  ); // Refund if base item not found
-                }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Not enough energy to spawn an item!"),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              }
-            },
-            label: const Text('Spawn 🌱'), // Update label
-            icon: const Icon(Icons.add_circle_outline),
-            // Update tooltip dynamically based on config cost
-            tooltip:
-                'Costs ${generatorConfigs['🏕️']?.energyCost ?? '?'} energy', // Corrected interpolation
-            backgroundColor: Colors.teal, // Example color
-          ),
-          const SizedBox(width: 10), // Spacing between FABs
           // --- Navigation Button ---
           FloatingActionButton(
+            // Keep only the navigation button
             heroTag: 'navFabGrid', // Unique heroTag for Grid screen nav
             onPressed: () {
               // Set the active screen index to 1 (MapScreen)
