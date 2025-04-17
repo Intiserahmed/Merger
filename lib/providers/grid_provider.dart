@@ -670,6 +670,61 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     }
   }
 
+  /// Moves an item from one tile to another.
+  void moveItem(int sourceRow, int sourceCol, int targetRow, int targetCol) {
+    if (sourceRow < 0 ||
+        sourceRow >= rowCount ||
+        sourceCol < 0 ||
+        sourceCol >= colCount ||
+        targetRow < 0 ||
+        targetRow >= rowCount ||
+        targetCol < 0 ||
+        targetCol >= colCount) {
+      return; // Bounds check
+    }
+
+    final currentGrid = state;
+    final sourceTile = currentGrid[sourceRow][sourceCol];
+    final targetTile = currentGrid[targetRow][targetCol];
+
+    // Prevent moving to or from locked tiles
+    if (targetTile.isLocked || sourceTile.isLocked) {
+      print("Cannot move to or from locked tiles.");
+      return;
+    }
+
+    // Ensure there's an item at the source and the target is empty
+    if (sourceTile.itemImagePath == null || targetTile.itemImagePath != null) {
+      print("Invalid move: source must have an item and target must be empty.");
+      return;
+    }
+
+    // Create new tile data for source and target
+    final newTargetData = TileData(
+      row: targetRow,
+      col: targetCol,
+      type: TileType.item,
+      baseImagePath: targetTile.baseImagePath,
+      itemImagePath: sourceTile.itemImagePath,
+    );
+    final newSourceData = TileData(
+      row: sourceRow,
+      col: sourceCol,
+      type: TileType.empty,
+      baseImagePath: sourceTile.baseImagePath,
+    );
+
+    // Update the grid state
+    final newGrid = currentGrid.map((row) => List<TileData>.from(row)).toList();
+    newGrid[targetRow][targetCol] = newTargetData;
+    newGrid[sourceRow][sourceCol] = newSourceData;
+    state = newGrid;
+
+    print(
+      "Moved item from ($sourceRow, $sourceCol) to ($targetRow, $targetCol).",
+    );
+  }
+
   // Add more methods as needed: fulfillOrderRequirement, etc.
 }
 

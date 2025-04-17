@@ -1,24 +1,29 @@
-// lib/widgets/game_grid_screen.dart (or wherever your screen is)
+// lib/widgets/game_grid_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:merger/models/order.dart';
-import 'package:merger/providers/order_provider.dart';
+import 'package:merger/providers/order_provider.dart'; // Keep for debug save?
 import 'package:merger/models/tile_unlock.dart';
 import 'package:merger/providers/expansion_provider.dart';
 import 'package:merger/main.dart'; // Import main to access global isar instance
 import 'package:merger/persistence/game_service.dart';
-import 'package:merger/widgets/info_popup.dart'; // Import the InfoPopup
-// No longer need merge_item.dart directly, mergeItemsByEmoji is in merge_trees.dart
+import 'package:merger/widgets/info_popup.dart'; // Keep for _buildTile
+import 'package:merger/widgets/game_grid/tile_content.dart'; // Import new helper
+import 'package:merger/widgets/game_grid/game_grid_hud.dart'; // Import HUD
+import 'package:merger/widgets/game_grid/game_grid_orders.dart'; // Import Orders
+import 'package:merger/widgets/game_grid/game_grid_bottom_bar.dart'; // Import Bottom Bar
+import 'package:merger/widgets/game_grid_components.dart'
+    hide buildTileContent; // Import helper
 
 import 'dart:math' as math;
 import '../models/tile_data.dart';
 import '../providers/grid_provider.dart' as grid;
 import '../providers/player_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../models/merge_trees.dart';
-import '../models/generator_config.dart';
+import '../models/merge_trees.dart'; // Keep for _buildTile merge logic
+// GeneratorConfig needed only by Bottom Bar now
+// import '../models/generator_config.dart';
 
-// Define colors for the chessboard pattern
+// Define colors (keep here or move to a theme file)
 final Color lightBrown = Colors.brown[300]!;
 final Color darkBrown = Colors.brown[600]!;
 final Color grassGreen = Colors.green[400]!;
@@ -35,38 +40,19 @@ class GameGridScreen extends ConsumerStatefulWidget {
 class _GameGridScreenState extends ConsumerState<GameGridScreen> {
   TileData? _selectedTile; // State variable for the selected tile
 
-  // --- Helper Methods moved into State class ---
-  Widget _buildTileContent(
-    String pathOrEmoji, {
-    BoxFit fit = BoxFit.contain,
-    double size = 28,
-  }) {
-    if (pathOrEmoji.contains('/')) {
-      return Image.asset(
-        pathOrEmoji,
-        fit: fit,
-        errorBuilder:
-            (context, error, stackTrace) => Center(
-              child: Icon(
-                Icons.error_outline,
-                color: Colors.red.shade300,
-                size: size * 0.8,
-              ),
-            ),
-      );
-    } else {
-      return Center(child: Text(pathOrEmoji, style: TextStyle(fontSize: size)));
-    }
-  }
-
-  // Method now belongs to _GameGridScreenState, uses `ref` directly
+  // --- Build Tile Method (Remains in State due to complexity and state access) ---
   Widget _buildTile(int index) {
     final int row = index ~/ grid.colCount;
     final int col = index % grid.colCount;
-    final gridData = ref.watch(grid.gridProvider); // Use `ref` from State
+    final gridData = ref.watch(grid.gridProvider);
 
+    // Bounds check (important!)
     if (row >= gridData.length || col >= gridData[0].length) {
-      return Container(color: Colors.red.withOpacity(0.2));
+      // Handle potential out-of-bounds during grid resize/init
+      return Container(
+        color: Colors.red.withOpacity(0.2),
+        margin: const EdgeInsets.all(1.0),
+      ); // Placeholder for error/loading
     }
     final TileData tileData = gridData[row][col];
 
@@ -89,28 +75,47 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
 
         if (targetTile.isLocked) return false;
 
+        // Allow dropping item onto empty tile
+        if (targetTile.itemImagePath == null && sourceTile.isItem) {
+          return true; // Accept dropping item onto empty tile
+        }
+
+        // Existing merge logic
         if (targetTile.itemImagePath != null &&
+            sourceTile.itemImagePath != null && // Ensure source has an item
             targetTile.itemImagePath == sourceTile.itemImagePath) {
           final nextItem = getNextItemInSequence(targetTile.itemImagePath!);
-          if (nextItem != null) {
-            return true;
-          } else if (targetTile.itemImagePath == '🐚' ||
+          // Allow merging final items of specific types if needed (adjust condition)
+          if (nextItem != null ||
+              targetTile.itemImagePath == '🐚' ||
               targetTile.itemImagePath == '⚔️') {
             return true;
           }
         }
 
-        return false;
+        return false; // Default deny
       },
       onAccept: (dragData) {
-        ref
-            .read(grid.gridProvider.notifier)
-            .mergeTiles(row, col, dragData.row, dragData.col);
+        final targetTile = gridData[row][col]; // Re-fetch target tile data
+        final sourceTile = dragData.tileData;
+
+        if (targetTile.itemImagePath == null && sourceTile.isItem) {
+          // Move item to empty tile
+          ref
+              .read(grid.gridProvider.notifier)
+              .moveItem(dragData.row, dragData.col, row, col);
+        } else if (targetTile.itemImagePath != null &&
+            targetTile.itemImagePath == sourceTile.itemImagePath) {
+          // Perform merge
+          ref
+              .read(grid.gridProvider.notifier)
+              .mergeTiles(row, col, dragData.row, dragData.col);
+        }
       },
       builder: (context, candidateData, rejectedData) {
         Widget content = Container(
           key: ValueKey(
-            'tile_${row}_${col}_${tileData.type}_${tileData.itemImagePath ?? 'base'}', // Corrected interpolation
+            'tile_${row}_${col}_${tileData.type}_${tileData.itemImagePath ?? 'base'}_${tileData.isReady}', // More specific key
           ),
           margin: const EdgeInsets.all(1.0),
           decoration: BoxDecoration(
@@ -135,22 +140,21 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
             fit: StackFit.expand,
             alignment: Alignment.center,
             children: [
-              // --- Base Layer (Generator/Locked) ---
+              // Base Layer (Generator/Locked) - Use helper
               if (tileData.isGenerator || tileData.isLocked)
-                _buildTileContent(
+                buildTileContent(
                   tileData.baseImagePath,
                   fit: BoxFit.contain,
                   size: 30,
                 ),
-              // --- Item Background (Star concept for items) --- REMOVED
-              // --- Item Layer (Conditional) ---
+              // Item Layer (Conditional) - Use helper
               if (tileData.itemImagePath != null)
-                _buildTileContent(
+                buildTileContent(
                   tileData.itemImagePath!,
                   fit: BoxFit.contain,
-                  size: 28, // Slightly smaller for item on top of star
+                  size: 28,
                 ),
-              // --- Cooldown Overlay for Generators ---
+              // Cooldown Overlay
               if (tileData.isGenerator && !tileData.isReady)
                 Positioned.fill(
                   child: Container(
@@ -160,7 +164,7 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        '${tileData.remainingCooldown.inSeconds}s', // Corrected interpolation
+                        '${tileData.remainingCooldown.inSeconds}s',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -174,517 +178,248 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
           ),
         );
 
-        // Wrap content in SizedBox for consistent sizing
-        content = SizedBox(
-          width: 50, // New smaller size
-          height: 50, // New smaller size
-          child: content,
-        );
+        content = SizedBox(width: 50, height: 50, child: content);
 
-        // --- Draggable Logic ---
-        bool isDraggable = tileData.isItem; // Only items are draggable now
+        // Draggable Logic
+        bool isDraggable = tileData.isItem;
         if (isDraggable) {
           return Draggable<TileDropData>(
             data: TileDropData(row: row, col: col, tileData: tileData),
-            // Feedback: Only the item image/emoji
             feedback: Material(
               color: Colors.transparent,
               child: SizedBox(
-                width: 45, // Slightly smaller feedback visual
+                width: 45,
                 height: 45,
-                child: _buildTileContent(
-                  tileData
-                      .itemImagePath!, // Assured to be non-null by isDraggable check
-                  size: 40, // Make dragged item slightly larger
-                ),
+                // Use helper for feedback
+                child: buildTileContent(tileData.itemImagePath!, size: 40),
               ),
             ),
-            // ChildWhenDragging: The original tile without the item
             childWhenDragging: SizedBox(
-              width: 50, // Match new smaller size
-              height: 50, // Match new smaller size
+              width: 50,
+              height: 50,
               child: Container(
-                // Rebuild the tile content *without* the item layer
-                key: ValueKey(
-                  'dragging_${row}_$col',
-                ), // Corrected interpolation
+                key: ValueKey('dragging_${row}_$col'),
                 margin: const EdgeInsets.all(1.0),
                 decoration: BoxDecoration(
-                  color: backgroundColor, // Keep original background
+                  color: backgroundColor,
                   border: Border.all(
                     color: Colors.black.withOpacity(0.2),
                     width: 0.5,
                   ),
-                  boxShadow: null, // No shadow when item is being dragged away
                   borderRadius: BorderRadius.circular(4.0),
                 ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  alignment: Alignment.center,
-                  children: [
-                    // Base Layer (Generator/Locked) - Should not be draggable anyway, but include for completeness
-                    if (tileData.isGenerator || tileData.isLocked)
-                      _buildTileContent(
-                        tileData.baseImagePath,
-                        fit: BoxFit.contain,
-                        size: 30,
-                      ),
-                    // Item Background (Star concept) - REMOVED
-                    // --- Item Layer is intentionally OMITTED here ---
-                  ],
-                ),
+                // Only show base if it exists (generator)
+                child:
+                    tileData.isGenerator
+                        ? buildTileContent(
+                          tileData.baseImagePath,
+                          fit: BoxFit.contain,
+                          size: 30,
+                        )
+                        : null, // Empty when dragging item from non-generator tile
               ),
             ),
-            child: content, // The original full tile content
+            child: content,
           );
         } else {
-          // --- GestureDetector for Taps (Locked, Generators, Empty) ---
+          // GestureDetector for Taps
           return GestureDetector(
             onTap: () {
-              // --- Update Selected Tile State ---
               setState(() {
-                // Toggle selection: if same tile tapped, deselect; otherwise select new tile.
                 _selectedTile = (_selectedTile == tileData) ? null : tileData;
               });
 
-              // --- Tap Logic for Non-Draggable Tiles ---
+              // Tap Logic for Non-Draggable Tiles
               if (tileData.isLocked) {
-                // --- Handle Tapping Locked Tile ---
-                final availableUnlocks = ref.read(availableUnlocksProvider);
-                // Use math.Point for consistency if TileUnlock uses it
-                final tappedPoint = math.Point(row, col);
-                TileUnlock? targetUnlock;
-
-                for (final unlock in availableUnlocks) {
-                  // Ensure unlock.coveredTiles contains math.Point objects
-                  // dart:math Point uses x/y, TileUnlock Point uses row/col.
-                  // Assuming coveredTiles uses the TileUnlock Point definition.
-                  if (unlock.coveredTiles.any(
-                    (p) =>
-                        p.row == row &&
-                        p.col == col, // Compare with tile's row/col
-                  )) {
-                    targetUnlock = unlock;
-                    break;
-                  }
-                }
-
-                if (targetUnlock != null) {
-                  // Attempt to unlock the zone
-                  final success = ref
-                      .read(playerStatsProvider.notifier)
-                      .unlockZone(targetUnlock);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        success
-                            ? "Zone '${targetUnlock.id}' unlocked!"
-                            : "Failed to unlock zone. Check level (${targetUnlock.requiredLevel}) and coins (${targetUnlock.unlockCostCoins}).", // Corrected interpolation
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                } else {
-                  // Tile is locked, but not part of an AVAILABLE unlock
-                  final allUnlocks = ref.read(allUnlocksProvider);
-                  final actualZone = allUnlocks.firstWhere(
-                    (u) => u.coveredTiles.any(
-                      (p) =>
-                          p.row == row &&
-                          p.col == col, // Compare with tile's row/col
-                    ),
-                    orElse:
-                        () =>
-                            TileUnlock(id: 'unknown_zone', requiredLevel: 999),
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        "Zone locked. Requires Level ${actualZone.requiredLevel}.", // Corrected interpolation
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                }
+                _handleLockedTileTap(row, col); // Extracted tap logic
               } else if (tileData.isGenerator) {
-                // --- Handle Tapping Generator ---
                 ref
                     .read(grid.gridProvider.notifier)
                     .activateGenerator(row, col);
               }
-              // Add other tap actions for empty tiles if needed later
-            },
-            child: content, // Wrap content in GestureDetector
-          ); // Not draggable
-        }
-      }, // End builder
-    );
-  }
-
-  // --- NEW Build Top Area (HUD) ---
-  // Method now belongs to _GameGridScreenState, uses `ref` directly
-  Widget _buildTopArea() {
-    final playerStats = ref.watch(playerStatsProvider); // Use `ref` from State
-    final level = playerStats.level;
-    final energy = playerStats.energy;
-    // final maxEnergy = playerStats.maxEnergy; // Not used in new design directly
-    final coins = playerStats.coins;
-    final gems = playerStats.gems;
-    // TODO: Get energy cooldown timer if available
-    final energyCooldown = null; // Placeholder
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12.0,
-        vertical: 8.0,
-      ).copyWith(top: MediaQuery.of(context).padding.top + 8.0), // Safe area
-      color: Colors.blue.shade700, // Example background color
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Profile icon with level
-          Row(
-            children: [
-              // Placeholder for CircleAvatar with AssetImage
-              const CircleAvatar(
-                backgroundColor: Colors.grey, // Placeholder color
-                radius: 20,
-                child: Text(
-                  '👤',
-                  style: TextStyle(fontSize: 24),
-                ), // Placeholder icon
-              ),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.blueAccent, width: 2),
-                ),
-                child: Text(
-                  '$level', // Corrected interpolation
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-
-          // Energy
-          _buildTopResource(
-            icon: '⚡',
-            value: '$energy', // Corrected interpolation
-            cooldown: energyCooldown, // Pass cooldown if available
-          ),
-
-          // Coins (Using coin emoji as placeholder for clover)
-          _buildTopResource(
-            icon: '🪙',
-            value: '$coins',
-          ), // Corrected interpolation
-          // Gems
-          _buildTopResource(
-            icon: '💎',
-            value: '$gems',
-          ), // Corrected interpolation
-        ],
-      ),
-    );
-  }
-
-  // --- NEW Helper for Top HUD Resources ---
-  Widget _buildTopResource({
-    required String icon,
-    required String value,
-    String? cooldown,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min, // Prevent column taking too much space
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 18)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        if (cooldown != null)
-          Text(
-            cooldown,
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.white70,
-            ), // Adjusted color
-          ),
-      ],
-    );
-  }
-
-  // --- NEW Build Bottom Info Bar ---
-  // Method now belongs to _GameGridScreenState, uses `context` and `_selectedTile`
-  Widget _buildBottomInfoBar() {
-    // Use the _selectedTile state
-    if (_selectedTile == null || _selectedTile!.isLocked) {
-      // Show nothing or a default message if no valid tile is selected
-      return const SizedBox(height: 50); // Placeholder height
-    }
-
-    final selectedTileData = _selectedTile!; // Guaranteed non-null here
-    final emoji = selectedTileData.itemImagePath;
-    final isGenerator = selectedTileData.isGenerator;
-    final mergeItem = emoji != null ? mergeItemsByEmoji[emoji] : null;
-    final generatorConfig = generatorConfigs[selectedTileData.baseImagePath];
-
-    String infoText = 'Select an item or generator.'; // Default text
-    Widget? popupToShow; // Widget to show on tap
-
-    if (isGenerator && generatorConfig != null) {
-      infoText =
-          'Generator: Produces ${selectedTileData.generatesItemPath ?? '??'}, ' // Added null check
-          'Cooldown: ${generatorConfig.cooldown}s';
-      popupToShow = InfoPopup(
-        generatorEmoji: selectedTileData.baseImagePath,
-        generatorConfig: generatorConfig,
-      );
-    } else if (mergeItem != null) {
-      infoText =
-          '${mergeItem.id.replaceAll("_", " ")} (Lvl ${mergeItem.level}). ' // Added level
-          'Merge to reach next level.';
-      popupToShow = InfoPopup(item: mergeItem);
-    } else if (emoji != null) {
-      // Handle case where it's an item but not in mergeItemsByEmoji (e.g., special items)
-      infoText = 'Item: $emoji';
-    } else {
-      // Empty tile selected (if tap logic allows selecting empty tiles)
-      infoText = 'Empty Tile';
-    }
-
-    return Container(
-      height: 50, // Give it a fixed height
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () {
-              if (popupToShow != null) {
-                showDialog(
-                  context: context, // Use context from State
-                  builder: (_) => popupToShow!,
-                );
+              // Handle tapping empty tiles if needed
+              else if (tileData.itemImagePath == null &&
+                  !tileData.isGenerator) {
+                // Optionally deselect or handle tap on empty tile
+                setState(() {
+                  _selectedTile = null; // Deselect on tapping empty tile
+                });
               }
             },
-            // Show info icon only if there's something to show info about
-            child: Icon(
-              Icons.info_outline,
-              color:
-                  popupToShow != null ? Colors.black54 : Colors.grey.shade300,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              infoText,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
-              overflow: TextOverflow.ellipsis, // Prevent overflow
-            ),
-          ),
-        ],
-      ),
+            child: content,
+          );
+        }
+      },
     );
   }
 
-  // --- NEW Helper Widget to Display Orders ---
-  // Method now belongs to _GameGridScreenState, uses `ref` directly
-  Widget _buildOrderDisplay() {
-    final orders = ref.watch(orderProvider); // Use `ref` from State
+  // --- Helper for Locked Tile Tap Logic ---
+  void _handleLockedTileTap(int row, int col) {
+    final availableUnlocks = ref.read(availableUnlocksProvider);
+    final mathPoint = math.Point<int>(
+      col,
+      row,
+    ); // Using math.Point (x, y) -> (col, row)
+    TileUnlock? targetUnlock;
 
-    if (orders.isEmpty) {
-      return const SizedBox(
-        height: 80,
-        child: Center(
-          child: Text(
-            "No active orders.",
-            style: TextStyle(color: Colors.white70),
-          ),
-        ),
-      );
+    // Find the unlock zone covering this tile
+    for (final unlock in availableUnlocks) {
+      // Assuming coveredTiles in TileUnlock uses a custom Point or similar structure {row, col}
+      if (unlock.coveredTiles.any((p) => p.row == row && p.col == col)) {
+        targetUnlock = unlock;
+        break;
+      }
+      // If TileUnlock uses math.Point:
+      // if (unlock.coveredTiles.any((p) => p.x == col && p.y == row)) {
+      //      targetUnlock = unlock;
+      //      break;
+      // }
     }
 
-    // Display only the first order for simplicity, matching the new design
-    final order = orders.first;
-    // Placeholder for reward text (assuming coins)
-    final rewardText = '+${order.rewardCoins}'; // Corrected interpolation
-
-    return Container(
-      height: 80,
-      color: Colors.black.withOpacity(0.2),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center, // Center the content
-        children: [
-          // Placeholder for NPC CircleAvatar
-          const CircleAvatar(
-            backgroundColor: Colors.brown, // Placeholder color
-            radius: 30,
-            child: Text(
-              '🧑',
-              style: TextStyle(fontSize: 30),
-            ), // Placeholder icon
-          ),
-          const SizedBox(width: 8), // Adjusted spacing
-          ElevatedButton(
-            onPressed: () {
-              ref
-                  .read(orderProvider.notifier)
-                  .attemptDelivery(order); // Use `ref` from State
-            },
-            style: ElevatedButton.styleFrom(
-              shape: const StadiumBorder(),
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+    if (targetUnlock != null) {
+      final success = ref
+          .read(playerStatsProvider.notifier)
+          .unlockZone(targetUnlock);
+      if (mounted) {
+        // Check if the widget is still in the tree
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? "Zone '${targetUnlock.id}' unlocked!"
+                  : "Failed to unlock zone. Check level (${targetUnlock.requiredLevel}) and coins (${targetUnlock.unlockCostCoins}).",
             ),
-            child: const Text('GO', style: TextStyle(fontSize: 16)),
+            duration: const Duration(seconds: 2),
           ),
-          const SizedBox(width: 8), // Adjusted spacing
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                rewardText,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.yellowAccent, // Highlight reward
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 4),
-              // Placeholder for Item Image
-              SizedBox(
-                width: 35,
-                height: 35,
-                child: _buildTileContent(
-                  order.requiredItemId,
-                  size: 30,
-                ), // Call helper directly
-              ),
-              // Text( // Optional: Show required count if needed
-              //   'x ${order.requiredCount}',
-              //   style: const TextStyle(color: Colors.white70, fontSize: 10),
-              // ),
-            ],
+        );
+      }
+    } else {
+      // Tile is locked, but not part of an *available* unlock
+      final allUnlocks = ref.read(allUnlocksProvider);
+      final actualZone = allUnlocks.firstWhere(
+        (u) => u.coveredTiles.any((p) => p.row == row && p.col == col),
+        // Provide a default/fallback TileUnlock if not found (adjust defaults)
+        orElse:
+            () => TileUnlock(
+              id: 'unknown',
+              requiredLevel: 999,
+              unlockCostCoins: 0,
+              coveredTiles: [],
+            ),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              actualZone.id != 'unknown'
+                  ? "Zone locked. Requires Level ${actualZone.requiredLevel}."
+                  : "Locked tile (Unknown zone).",
+            ), // Handle case where zone isn't found
+            duration: const Duration(seconds: 1),
           ),
-        ],
-      ),
-    );
+        );
+      }
+    }
   }
 
+  // --- Build Method (Simplified) ---
   @override
-  // Correct build signature for State
   Widget build(BuildContext context) {
-    // Get screen size for potential adjustments
-    // final screenSize = MediaQuery.of(context).size;
-    // `ref` is now accessed directly as a property of ConsumerState
-
+    // `ref` is available via the `ConsumerState`
     return Scaffold(
-      // Remove AppBar
-      // appBar: AppBar(...),
-      backgroundColor: Colors.blueGrey.shade900, // Darker background overall
+      backgroundColor: Colors.blueGrey.shade900,
       body: Column(
-        // Use Column for layout
         children: [
-          // --- Top Area (Status Bar + Level) ---
-          _buildTopArea(), // Call helper directly
-          // --- Debug Buttons (Optional, keep for now) ---
+          // --- Top HUD ---
+          const GameGridHud(), // Use the new widget
+          // --- Debug Buttons (Optional) ---
           Row(
+            /* ... keep debug buttons if needed ... */
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
                 icon: const Icon(Icons.build, color: Colors.white54),
                 tooltip: 'Place Camp (Debug)',
-                onPressed: () {
-                  ref
-                      .read(grid.gridProvider.notifier)
-                      .placeGenerator(1, 1, '🏕️');
-                },
+                onPressed:
+                    () => ref
+                        .read(grid.gridProvider.notifier)
+                        .placeGenerator(1, 1, '🏕️'),
               ),
               IconButton(
                 icon: const Icon(Icons.agriculture, color: Colors.white54),
                 tooltip: 'Place Mine (Debug)',
-                onPressed: () {
-                  ref
-                      .read(grid.gridProvider.notifier)
-                      .placeGenerator(2, 2, '⛏️');
-                },
+                onPressed:
+                    () => ref
+                        .read(grid.gridProvider.notifier)
+                        .placeGenerator(2, 2, '⛏️'),
               ),
               IconButton(
                 icon: const Icon(Icons.factory, color: Colors.white54),
                 tooltip: 'Place Workshop (Debug)',
-                onPressed: () {
-                  ref
-                      .read(grid.gridProvider.notifier)
-                      .placeGenerator(3, 3, '🏭');
-                },
+                onPressed:
+                    () => ref
+                        .read(grid.gridProvider.notifier)
+                        .placeGenerator(3, 3, '🏭'),
               ),
               IconButton(
                 icon: const Icon(Icons.save, color: Colors.white54),
                 tooltip: 'Save Game State (Debug)',
                 onPressed: () async {
-                  // Corrected way to access container for GameService
                   final container = ProviderScope.containerOf(context);
                   await GameService(isar, container).saveGame();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Game state saved!"),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Game state saved!"),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  }
                 },
               ),
             ],
           ),
-          // --- Order Display Area ---
-          _buildOrderDisplay(), // Call helper directly
+
+          // --- Order Display ---
+          const GameGridOrders(), // Use the new widget
           // --- Game Grid ---
           Expanded(
-            // Grid takes remaining space
             child: Padding(
-              padding: const EdgeInsets.all(8.0), // Padding around the grid
+              padding: const EdgeInsets.all(8.0),
               child: Center(
-                // Center the grid if it doesn't fill width
                 child: GridView.builder(
-                  shrinkWrap: true, // Important if grid is centered or smaller
+                  shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: grid.rowCount * grid.colCount,
+                  itemCount: grid.rowCount * grid.colCount, // Use constants
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: grid.colCount,
-                    childAspectRatio: 1.0, // Keep square tiles
-                    mainAxisSpacing: 1.0, // Spacing between rows
-                    crossAxisSpacing: 1.0, // Spacing between columns
+                    childAspectRatio: 1.0,
+                    mainAxisSpacing: 1.0,
+                    crossAxisSpacing: 1.0,
                   ),
-                  itemBuilder: (context, index) {
-                    // Context is implicitly available
-                    return _buildTile(index); // Call helper directly
-                  },
+                  // Use the _buildTile method defined within this State class
+                  itemBuilder: (context, index) => _buildTile(index),
                 ),
               ),
             ),
           ),
 
           // --- Bottom Info Bar ---
-          _buildBottomInfoBar(), // Call helper directly
+          // Pass the selected tile state to the bottom bar widget
+          GameGridBottomBar(selectedTile: _selectedTile),
         ],
       ),
+
       // --- Floating Action Buttons ---
       floatingActionButton: Row(
-        // Use a Row to place buttons side-by-side
-        mainAxisAlignment: MainAxisAlignment.end, // Align to the end
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // --- Spawn Button Removed ---
-
-          // --- Navigation Button ---
           FloatingActionButton(
-            // Keep only the navigation button
-            heroTag: 'navFabGrid', // Unique heroTag for Grid screen nav
+            heroTag: 'navFabGrid',
             onPressed: () {
-              // Set the active screen index to 1 (MapScreen)
-              ref.read(activeScreenIndexProvider.notifier).state = 1;
+              ref.read(activeScreenIndexProvider.notifier).state =
+                  1; // Navigate to Map
             },
             tooltip: 'Go to Map',
             backgroundColor: Colors.blueAccent,
@@ -694,4 +429,13 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
       ),
     );
   }
-} // End of _GameGridScreenState class
+}
+
+// Define TileDropData class (can be moved to models/tile_data.dart if preferred)
+class TileDropData {
+  final int row;
+  final int col;
+  final TileData tileData;
+
+  TileDropData({required this.row, required this.col, required this.tileData});
+}
