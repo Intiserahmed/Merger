@@ -264,8 +264,8 @@ class OrderNotifier extends StateNotifier<List<Order>> {
         "Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins.", // Removed XP from log
       );
 
-      // --- Notify PlayerStatsNotifier about completion ---
-      playerNotifier.orderCompleted();
+      // --- Player level up is now handled by infrastructure upgrades ---
+      // playerNotifier.orderCompleted(); // REMOVED
 
       // 5. Remove the completed order
       state = state.where((order) => order.id != orderToDeliver.id).toList();

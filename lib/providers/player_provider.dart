@@ -18,15 +18,18 @@ final playerLevelProvider = StateProvider<int>((ref) => 1); // Initial Level
 // Define energy cost for spawning an item - Removing as spawn button will be removed
 // const int spawnEnergyCost = 10;
 
-// --- Define total orders needed to reach each level ---
-const Map<int, int> _totalOrdersPerLevel = {
-  2: 3, // Need 3 total orders to reach level 2
-  3: 8, // Need 8 total orders to reach level 3 (5 more)
-  4: 15, // Need 15 total orders to reach level 4 (7 more)
-  5: 25, // Need 25 total orders to reach level 5 (10 more)
-  6: 40, // Need 40 total orders to reach level 6 (15 more) - Max level 5 for now
-  // Add more levels as needed
+// --- Define infrastructure upgrade costs and max level ---
+const int maxInfrastructureUpgrade = 5;
+const Map<int, int> infrastructureUpgradeCost = {
+  // Upgrade Level : Cost
+  1: 10, // New cost
+  2: 15, // New cost
+  3: 20, // New cost
+  4: 25, // New cost
+  5: 30, // New cost
 };
+// Define max player level based on infrastructure definitions
+const int maxPlayerLevel = 5; // Example: Up to level 5 infrastructure
 
 // A single Notifier for the whole PlayerStats object (better if stats often change together)
 class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
@@ -36,10 +39,8 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
   // Initialize with a non-const PlayerStats instance and start the timer
   PlayerStatsNotifier(this.ref)
     : super(
-        PlayerStats(
-          // Initialize ordersForNextLevel for level 1 -> 2
-          ordersForNextLevel: _totalOrdersPerLevel[2] ?? 3,
-        ),
+        // PlayerStats initializes with default infrastructure level ["1:0"]
+        PlayerStats(),
       ) {
     _startEnergyRegeneration();
   }
@@ -53,14 +54,17 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       if (state.energy < state.maxEnergy) {
         // Create a new state object with updated energy
         // Isar manages the ID, so we don't pass it here.
+        // Create a new state object, copying all fields and updating energy
         state = PlayerStats(
           level: state.level,
           xp: state.xp,
           coins: state.coins,
-          gems: state.gems, // Include gems
-          energy: state.energy + 1, // Increment energy
+          gems: state.gems,
+          energy: state.energy + 1, // Update energy
           maxEnergy: state.maxEnergy,
-          initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
+          initialUnlockedZoneIds: state.unlockedZoneIds,
+          // Ensure infrastructure data is copied
+          initialInfrastructureLevelsData: state.infrastructureLevelsData,
         );
       } else {
         // Optional: Could cancel the timer if energy is full and restart when spent,
@@ -87,8 +91,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds,
-      completedOrders: state.completedOrders, // Keep existing order count
-      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
+      initialInfrastructureLevelsData: state.infrastructureLevelsData,
     );
     // _checkLevelUp(); // Remove XP-based level up check
   }
@@ -101,10 +104,11 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
         level: state.level,
         xp: state.xp,
         coins: state.coins,
-        gems: state.gems, // Include gems
+        gems: state.gems,
         energy: state.energy - amount, // Update energy
         maxEnergy: state.maxEnergy,
-        initialUnlockedZoneIds: state.unlockedZoneIds, // Keep existing zones
+        initialUnlockedZoneIds: state.unlockedZoneIds,
+        initialInfrastructureLevelsData: state.infrastructureLevelsData,
       );
       // Consider restarting the timer here if it was stopped when full
       // _startEnergyRegeneration(); // If implementing stop-when-full logic
@@ -131,8 +135,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       energy: newEnergy, // Update energy
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds,
-      completedOrders: state.completedOrders, // Keep existing order count
-      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
+      initialInfrastructureLevelsData: state.infrastructureLevelsData,
     );
     // Consider restarting the timer here if it was stopped when full
     // if (newEnergy < state.maxEnergy) _startEnergyRegeneration();
@@ -148,40 +151,89 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds,
-      completedOrders: state.completedOrders, // Keep existing order count
-      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
+      initialInfrastructureLevelsData: state.infrastructureLevelsData,
     );
   }
 
-  // --- NEW: Method called when an order is successfully completed ---
-  void orderCompleted() {
-    final newCompletedOrders = state.completedOrders + 1;
+  // --- NEW: Method for upgrading infrastructure ---
+  bool upgradeInfrastructure(int levelToUpgrade) {
+    final currentInfrastructures = state.infrastructureLevels;
+    final currentUpgradeLevel = currentInfrastructures[levelToUpgrade] ?? 0;
+
+    if (currentUpgradeLevel >= maxInfrastructureUpgrade) {
+      print("Infrastructure for level $levelToUpgrade already maxed out.");
+      return false;
+    }
+
+    final cost = infrastructureUpgradeCost[currentUpgradeLevel + 1];
+    if (cost == null) {
+      print(
+        "Error: No cost defined for upgrading level $levelToUpgrade infrastructure to level ${currentUpgradeLevel + 1}",
+      );
+      return false;
+    }
+
+    if (state.coins < cost) {
+      print(
+        "Not enough coins to upgrade level $levelToUpgrade infrastructure. Need $cost, have ${state.coins}",
+      );
+      return false;
+    }
+
+    // Spend coins
+    spendCoins(cost); // This already updates the state
+
+    // Update the infrastructure level
+    final newUpgradeLevel = currentUpgradeLevel + 1;
+    final newInfrastructureData = List<String>.from(
+      state.infrastructureLevelsData,
+    );
+    final index = newInfrastructureData.indexWhere(
+      (s) => s.startsWith('$levelToUpgrade:'),
+    );
+    if (index != -1) {
+      newInfrastructureData[index] = '$levelToUpgrade:$newUpgradeLevel';
+    } else {
+      // Should not happen if initialized correctly, but handle defensively
+      newInfrastructureData.add('$levelToUpgrade:$newUpgradeLevel');
+    }
+
+    // Update the state with the new infrastructure data
+    // We need to read the state *after* spendCoins potentially updated it
+    final currentState = state; // Capture state after spendCoins
     state = PlayerStats(
-      level: state.level,
-      xp: state.xp, // Keep XP separate
-      coins: state.coins, // Rewards are added separately by OrderNotifier
-      gems: state.gems,
-      energy: state.energy,
-      maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds,
-      completedOrders: newCompletedOrders, // Increment completed orders
-      ordersForNextLevel: state.ordersForNextLevel, // Keep target for now
+      level: currentState.level,
+      xp: currentState.xp,
+      coins: currentState.coins, // Coins already updated by spendCoins
+      gems: currentState.gems,
+      energy: currentState.energy,
+      maxEnergy: currentState.maxEnergy,
+      initialUnlockedZoneIds: currentState.unlockedZoneIds,
+      initialInfrastructureLevelsData:
+          newInfrastructureData, // The updated list
     );
-    _checkLevelUp(); // Check if this completion triggers a level up
+
+    print(
+      "Upgraded infrastructure for level $levelToUpgrade to level $newUpgradeLevel for $cost coins.",
+    );
+
+    // Check for player level up after infrastructure upgrade
+    _checkPlayerLevelUp();
+
+    return true;
   }
 
-  /// Checks if the completed orders meet the threshold for the next level.
-  void _checkLevelUp() {
-    // Check if player has completed enough orders for the *next* level
-    if (state.completedOrders >= state.ordersForNextLevel) {
-      // Check if there's a defined next level target
-      if (_totalOrdersPerLevel.containsKey(state.level + 1)) {
-        levelUp();
-        // Optional: Recursively call _checkLevelUp() if multiple levels might be gained
-        // _checkLevelUp();
-      } else {
-        print("Max level reached (based on defined orders per level).");
-      }
+  // --- NEW: Check for player level up based on infrastructure ---
+  void _checkPlayerLevelUp() {
+    final currentLevel = state.level;
+    if (currentLevel >= maxPlayerLevel) return; // Already max level
+
+    final currentInfrastructures = state.infrastructureLevels;
+    final currentLevelInfraUpgrade = currentInfrastructures[currentLevel] ?? 0;
+
+    if (currentLevelInfraUpgrade >= maxInfrastructureUpgrade) {
+      // Current level's infrastructure is maxed, trigger player level up
+      levelUp();
     }
   }
 
@@ -196,8 +248,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
         energy: state.energy,
         maxEnergy: state.maxEnergy,
         initialUnlockedZoneIds: state.unlockedZoneIds,
-        completedOrders: state.completedOrders, // Keep existing order count
-        ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
+        initialInfrastructureLevelsData: state.infrastructureLevelsData,
       );
     } else {
       print("Not enough coins!");
@@ -205,12 +256,23 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
     }
   }
 
-  // Modified levelUp for order-based progression
+  // Modified levelUp for infrastructure-based progression
   void levelUp() {
-    final nextLevel = state.level + 1;
-    // Get the total orders needed for the level *after* the next one, or a high number if max level
-    final ordersForLevelAfterNext =
-        _totalOrdersPerLevel[nextLevel + 1] ?? 999999;
+    final currentLevel = state.level;
+    if (currentLevel >= maxPlayerLevel) {
+      print("Already at max player level ($maxPlayerLevel).");
+      return;
+    }
+
+    final nextLevel = currentLevel + 1;
+    final currentInfrastructureData = List<String>.from(
+      state.infrastructureLevelsData,
+    );
+
+    // Add the next level's infrastructure entry if it doesn't exist
+    if (!currentInfrastructureData.any((s) => s.startsWith('$nextLevel:'))) {
+      currentInfrastructureData.add('$nextLevel:0');
+    }
 
     state = PlayerStats(
       level: nextLevel, // Update level
@@ -221,12 +283,11 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       maxEnergy: state.maxEnergy + 10, // Increase max energy by 10
       energy: state.maxEnergy + 10, // Refill energy to the new max
       initialUnlockedZoneIds: state.unlockedZoneIds,
-      completedOrders: state.completedOrders, // Keep total completed orders
-      // Set the target for the *next* level up
-      ordersForNextLevel: ordersForLevelAfterNext,
+      initialInfrastructureLevelsData:
+          currentInfrastructureData, // Include new level entry
     );
     print(
-      "Level Up! Reached level ${state.level}. Max energy increased to ${state.maxEnergy}. Next level at ${state.ordersForNextLevel} total orders.",
+      "*** PLAYER LEVEL UP! Reached level ${state.level}. Max energy increased to ${state.maxEnergy}. ***",
     );
     // Consider restarting the timer here if it was stopped when full
     // _startEnergyRegeneration(); // If implementing stop-when-full logic
@@ -244,9 +305,8 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       energy: loadedStats.energy,
       maxEnergy: loadedStats.maxEnergy,
       initialUnlockedZoneIds: loadedStats.unlockedZoneIds,
-      // Load order progress
-      completedOrders: loadedStats.completedOrders,
-      ordersForNextLevel: loadedStats.ordersForNextLevel,
+      // Load infrastructure progress
+      initialInfrastructureLevelsData: loadedStats.infrastructureLevelsData,
     );
     // Ensure timer restarts
     _startEnergyRegeneration();
@@ -289,8 +349,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: newUnlockedIds, // Assign the updated list
-      completedOrders: state.completedOrders, // Keep existing order count
-      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
+      initialInfrastructureLevelsData: state.infrastructureLevelsData,
     );
 
     // 4. Optional: Update Grid Tiles
@@ -316,8 +375,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       energy: state.energy,
       maxEnergy: state.maxEnergy,
       initialUnlockedZoneIds: state.unlockedZoneIds,
-      completedOrders: state.completedOrders, // Keep existing order count
-      ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
+      initialInfrastructureLevelsData: state.infrastructureLevelsData,
     );
   }
 
@@ -331,8 +389,7 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
         energy: state.energy,
         maxEnergy: state.maxEnergy,
         initialUnlockedZoneIds: state.unlockedZoneIds,
-        completedOrders: state.completedOrders, // Keep existing order count
-        ordersForNextLevel: state.ordersForNextLevel, // Keep existing target
+        initialInfrastructureLevelsData: state.infrastructureLevelsData,
       );
       return true;
     } else {

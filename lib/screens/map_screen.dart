@@ -104,44 +104,94 @@ class MapScreen extends ConsumerWidget {
           // --- Top Status Bar ---
           _buildTopArea(context, ref),
 
-          // --- Map Content Placeholder ---
+          // --- Infrastructure Upgrade List ---
           Expanded(
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      spreadRadius: 5,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              // Build items up to the max defined player level
+              itemCount: maxPlayerLevel,
+              itemBuilder: (context, index) {
+                final infrastructureLevelKey = index + 1; // Level 1, 2, 3...
+                final playerStats = ref.watch(playerStatsProvider);
+                final currentUpgradeLevel =
+                    playerStats.infrastructureLevels[infrastructureLevelKey] ??
+                    0; // Default to 0 if not found
+                final bool isMaxed =
+                    currentUpgradeLevel >= maxInfrastructureUpgrade;
+                final nextUpgradeCost =
+                    isMaxed
+                        ? null
+                        : infrastructureUpgradeCost[currentUpgradeLevel + 1];
+                final bool canAfford =
+                    nextUpgradeCost != null &&
+                    playerStats.coins >= nextUpgradeCost;
+                final bool canUpgrade =
+                    !isMaxed &&
+                    nextUpgradeCost != null &&
+                    playerStats.level >=
+                        infrastructureLevelKey; // Can only upgrade current or past levels
+
+                // Placeholder icons for different levels
+                final icons = ['🏠', '🏭', '🏛️', '🏰', '🚀'];
+                final icon = icons[index % icons.length];
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  elevation: 3,
+                  child: ListTile(
+                    leading: Text(icon, style: const TextStyle(fontSize: 30)),
+                    title: Text(
+                      'Level $infrastructureLevelKey Infrastructure',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  ],
-                ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.map_outlined, size: 80, color: Colors.blueGrey),
-                    SizedBox(height: 15),
-                    Text(
-                      'Map Area Placeholder',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueGrey,
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Upgrade: $currentUpgradeLevel / $maxInfrastructureUpgrade',
+                        ),
+                        if (!isMaxed && nextUpgradeCost != null)
+                          Text(
+                            'Next Cost: $nextUpgradeCost 💰',
+                            style: TextStyle(
+                              color: canAfford ? Colors.green : Colors.red,
+                            ),
+                          )
+                        else if (isMaxed)
+                          const Text(
+                            'Max Level Reached',
+                            style: TextStyle(color: Colors.blue),
+                          )
+                        else // Should not happen if costs are defined correctly
+                          const Text(
+                            'Error: Cost not found',
+                            style: TextStyle(color: Colors.orange),
+                          ),
+                      ],
+                    ),
+                    trailing: ElevatedButton(
+                      onPressed:
+                          (canUpgrade && canAfford)
+                              ? () {
+                                ref
+                                    .read(playerStatsProvider.notifier)
+                                    .upgradeInfrastructure(
+                                      infrastructureLevelKey,
+                                    );
+                              }
+                              : null, // Disable button if cannot upgrade/afford
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            (canUpgrade && canAfford)
+                                ? Colors.green
+                                : Colors.grey,
                       ),
+                      child: const Text('Upgrade'),
                     ),
-                    SizedBox(height: 10),
-                    Text(
-                      '(Implement map graphics and logic here)',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.blueGrey),
-                    ),
-                  ],
-                ),
-              ),
+                    enabled: canUpgrade, // Grey out tile if level not reached
+                  ),
+                );
+              },
             ),
           ),
         ],

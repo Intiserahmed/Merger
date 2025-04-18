@@ -16,9 +16,9 @@ class PlayerStats {
   int maxEnergy; // Maximum energy capacity
   List<String> unlockedZoneIds; // Store IDs of unlocked zones
 
-  // --- New fields for order-based leveling ---
-  int completedOrders; // Total orders completed
-  int ordersForNextLevel; // Orders needed to reach the next level
+  // --- New field for infrastructure-based leveling ---
+  // Stores data like ["1:0", "2:0"] (level:upgradeLevel)
+  List<String> infrastructureLevelsData;
 
   // Constructor with default values
   PlayerStats({
@@ -29,10 +29,27 @@ class PlayerStats {
     this.energy = 100,
     this.maxEnergy = 100, // Default max energy
     List<String>? initialUnlockedZoneIds, // Make it optional
-    this.completedOrders = 0, // Start with 0 completed orders
-    this.ordersForNextLevel = 3, // Example: Need 3 orders for level 2
-  }) : unlockedZoneIds =
-           initialUnlockedZoneIds ?? []; // Initialize to empty list if null
+    List<String>? initialInfrastructureLevelsData, // Optional for loading
+  }) : unlockedZoneIds = initialUnlockedZoneIds ?? [],
+       // Initialize with level 1 infrastructure at upgrade 0 if not provided
+       infrastructureLevelsData = initialInfrastructureLevelsData ?? ['1:0'];
+
+  // Helper getter to parse the stored data into a usable map
+  @ignore // Tell Isar to ignore this getter
+  Map<int, int> get infrastructureLevels {
+    final map = <int, int>{};
+    for (final entry in infrastructureLevelsData) {
+      final parts = entry.split(':');
+      if (parts.length == 2) {
+        final levelKey = int.tryParse(parts[0]);
+        final upgradeLevel = int.tryParse(parts[1]);
+        if (levelKey != null && upgradeLevel != null) {
+          map[levelKey] = upgradeLevel;
+        }
+      }
+    }
+    return map;
+  }
 
   // Note: Removed copyWith, ==, and hashCode
 }
