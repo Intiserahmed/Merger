@@ -16,22 +16,24 @@
 *   **Initial Setup:** Camp, Mine, and Workshop generators are placed on the grid at startup. Configuration for Mine (`⛏️`) added.
 *   **Generator Activation:** Cooldown check is temporarily disabled.
 
-## What's Left to Build
+## What's Left to Build (Prioritized)
 
-*   **Map Screen Implementation:** Replace the placeholder with actual map graphics, navigation, and potentially zone previews/interactions. Update its Top HUD to match `GameGridScreen`.
+*   **Refactor Shared UI:** Extract the new Top HUD code (`_buildTopArea`, `_buildTopResource`) into a shared widget for `GameGridScreen` and `MapScreen`. (Highest Priority)
 *   **Grid UI Polish & Refinement:**
-    *   Replace placeholder emojis/icons in `GameGridScreen`'s Top HUD (`👤`, `🪙`), Order Display (`🧑`), and Bottom Info Bar (`ℹ️`) with actual assets/icons.
-    *   Implement dynamic text updates for the Bottom Info Bar based on selected tile (Partially done, needs polish).
-    *   Implement energy cooldown display in the Top HUD.
-    *   Refine tile sizing, spacing, and item shadow appearance.
-    *   Implement animations and visual feedback for merges, unlocks, etc.
-*   **Refactor Shared UI:** Extract the new Top HUD code (`_buildTopArea`, `_buildTopResource`) into a shared widget used by both `GameGridScreen` and `MapScreen`.
+    *   Replace placeholder emojis/icons in Top HUD (`👤`, `🪙`), Order Display (`🧑`), Bottom Info Bar (`ℹ️`).
+    *   Implement dynamic text updates for Bottom Info Bar (Needs polish).
+    *   Implement energy cooldown display in Top HUD.
+    *   Refine tile sizing, spacing, shadows.
+    *   Implement animations/feedback (merges, unlocks).
+*   **Map Screen Implementation:**
+    *   Integrate the shared Top HUD.
+    *   Replace placeholder with actual map graphics, navigation, zone previews.
 *   **Content Expansion:**
-    *   Populate `mergeItemsByEmoji` map in `lib/models/merge_trees.dart` with all items.
-    *   Add more merge chains, generators, orders (using new items), and unlockable zones/map areas.
-*   **Balancing:** Fine-tune order requirements, rewards, generator cooldowns/costs, and level-up order counts for the new progression system. Balance XP rewards if XP is kept for other purposes.
-*   **Testing:** Implement automated tests for core mechanics, UI interactions, persistence, and the new leveling/order system.
-*   **Advanced Features:** (Same as before) Achievements, Quests, Social, etc.
+    *   **Crucial:** Populate `mergeItemsByEmoji` map in `lib/models/merge_trees.dart`.
+    *   Add more merge chains, generators, orders, unlockable zones/map areas.
+*   **Balancing:** Fine-tune order requirements, rewards, generator cooldowns/costs (cooldown disabled), level-up order counts. Balance XP if kept.
+*   **Testing:** Implement automated tests (leveling, orders, UI). Re-enable and test cooldowns.
+*   **Advanced Features:** Achievements, Quests, Social, etc.
 
 ## Current Status
 
@@ -39,13 +41,13 @@ The game now features two distinct merge sequences (Plants and Tools). The `Game
 
 ## Known Issues
 
-*   **Map Screen Placeholder:** The map screen is not yet functional and uses the old status bar.
-*   **Grid Screen Placeholders:** Top HUD, Order Display, and Bottom Info Bar use placeholder emojis/icons. Bottom Info Bar text is dynamic but needs polish. Energy cooldown is not displayed.
-*   **Shared UI Needed:** The new Top HUD logic needs to be shared between screens.
-*   **Limited Content:** Needs more items, orders, etc. `mergeItemsByEmoji` map needs full population.
-*   **Balancing Needed:** Game economy and progression (orders per level, rewards, costs) require tuning for the new system.
-*   **No Automated Testing:** Tests are still pending. Re-enable and test cooldowns later.
-*   **Hardcoded Values:** Some configuration values remain hardcoded (e.g., generator positions, order definitions).
+*   **Shared UI Needed:** The new Top HUD logic is not yet extracted into a shared widget. (Top Priority Block)
+*   **Map Screen Placeholder:** The map screen is not functional and uses the old status bar (Blocked by Shared UI).
+*   **Grid Screen Placeholders:** Top HUD, Order Display, Bottom Info Bar use placeholders. Bottom Info Bar text needs polish. Energy cooldown not displayed.
+*   **Limited Content:** Needs more items, orders, etc. `mergeItemsByEmoji` map needs full population (Crucial).
+*   **Balancing Needed:** Game economy and progression require tuning. Generator cooldowns disabled.
+*   **No Automated Testing:** Tests are pending.
+*   **Hardcoded Values:** Some configuration values remain hardcoded.
 
 ## Evolution of Project Decisions
 

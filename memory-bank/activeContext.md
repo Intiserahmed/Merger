@@ -75,20 +75,23 @@ Overhauling the UI, adding a Map Screen, and refining the Game Grid Screen based
 *   **Build Runner:** Executed successfully after `PlayerStats` model changes.
 
 
-## Next Steps
+## Next Steps (Prioritized)
 
-*   **Map Screen Implementation:** Replace the placeholder in `MapScreen` with actual map graphics, navigation, and potentially zone previews/interactions. Update its Top HUD.
+*   **Refactor Shared UI:** Extract the new Top HUD code (`_buildTopArea`, `_buildTopResource`) into a shared widget to be used by both `GameGridScreen` and `MapScreen`. This is a prerequisite for consistent UI across screens.
 *   **Grid UI Refinement:**
     *   Replace placeholder emojis/icons in the Top HUD, Order Display, and Bottom Info Bar with actual assets or final icons.
-    *   Implement dynamic text updates for the Bottom Info Bar based on selected tile (Partially done, needs polish).
+    *   Implement dynamic text updates for the Bottom Info Bar based on selected tile (Needs polish).
     *   Implement energy cooldown display in the Top HUD.
     *   Further adjust grid layout for the new 9x7 dimensions if needed.
-*   **Refactor Shared UI:** Extract the new Top HUD code (`_buildTopArea`, `_buildTopResource`) into a shared widget used by both `GameGridScreen` and `MapScreen`.
+*   **Map Screen Implementation:**
+    *   Integrate the shared Top HUD.
+    *   Replace the placeholder in `MapScreen` with actual map graphics, navigation, and potentially zone previews/interactions.
 *   **Content Expansion:**
-    *   Populate `mergeItemsByEmoji` map in `lib/models/merge_trees.dart` with all items.
-    *   Add more merge chains, generators, orders (using new items), and unlockable zones/map areas.
+    *   **Crucial:** Populate `mergeItemsByEmoji` map in `lib/models/merge_trees.dart` with definitions for all planned items.
+    *   Add more merge chains, generators, and orders (using the newly defined items).
+    *   Define and add more unlockable zones/map areas.
 *   **Balancing:** Fine-tune order requirements, rewards, generator cooldowns/costs (cooldown currently disabled), and level-up order counts for the new progression system. Balance XP rewards if XP is kept for other purposes.
-*   **Testing:** Implement automated tests, especially for the new leveling and order systems. Re-enable and test cooldowns later.
+*   **Testing:** Implement automated tests, especially for the new leveling, order systems, and UI interactions. Re-enable and test generator cooldowns.
 
 ## Active Decisions and Considerations
 
