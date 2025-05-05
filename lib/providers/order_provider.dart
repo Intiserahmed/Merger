@@ -192,17 +192,11 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     state = initialOrders; // Set the initial state
   }
 
-  // Helper to get all possible orders up to the player's current level
+  // Helper to get orders *specifically* for the given player level.
   List<Order> _getAvailableOrdersForLevel(int playerLevel) {
-    final possibleOrders = <Order>[];
-    for (int level = 1; level <= playerLevel; level++) {
-      if (_ordersByLevel.containsKey(level)) {
-        possibleOrders.addAll(_ordersByLevel[level]!);
-      }
-    }
-    // Remove duplicates if orders are redefined at higher levels (optional, depends on design)
-    // For now, assumes orders are additive or unique IDs prevent issues.
-    return possibleOrders;
+    // Return only the orders defined for the exact level.
+    // Return an empty list if the level isn't defined or has no orders.
+    return List<Order>.from(_ordersByLevel[playerLevel] ?? []);
   }
 
   /// Attempts to deliver items for a specific order.
@@ -322,41 +316,42 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     }
   }
 
-  // Fills empty order slots, typically called after a level up detected by the listener.
+  // Replaces the current orders with a fresh set based on the player's new level.
+  // Called after a level up is detected by the listener.
   void _fillOrderSlots() {
     const int maxActiveOrders = 3;
-    int ordersToAdd = maxActiveOrders - state.length;
+    final playerLevel =
+        ref.read(playerStatsProvider).level; // Read the new level
     print(
-      "[OrderNotifier] _fillOrderSlots: Current orders: ${state.length}, Need to add: $ordersToAdd",
+      "[OrderNotifier] _fillOrderSlots: Refreshing orders for new level $playerLevel",
     );
 
-    if (ordersToAdd <= 0) return; // No slots to fill
-
-    final playerLevel =
-        ref.read(playerStatsProvider).level; // Read the latest level
-    print("[OrderNotifier] _fillOrderSlots: Filling for level $playerLevel");
     final availableOrders = _getAvailableOrdersForLevel(playerLevel);
     final random = Random();
-    final activeOrderIds = state.map((o) => o.id).toSet();
-    availableOrders.removeWhere((o) => activeOrderIds.contains(o.id));
+    final List<Order> newOrders = []; // Start with an empty list
 
-    final List<Order> newlyAddedOrders = [];
-    for (int i = 0; i < ordersToAdd && availableOrders.isNotEmpty; i++) {
+    // Ensure we don't try to pick more orders than are available for the level
+    int ordersToGenerate = min(maxActiveOrders, availableOrders.length);
+
+    for (int i = 0; i < ordersToGenerate; i++) {
+      // Check if availableOrders is empty before accessing it
+      if (availableOrders.isEmpty) break;
+
       final randomIndex = random.nextInt(availableOrders.length);
-      final newOrder = availableOrders.removeAt(
-        randomIndex,
-      ); // Remove to ensure uniqueness
-      newlyAddedOrders.add(newOrder);
-      print(
-        "[OrderNotifier] _fillOrderSlots: Adding new order ${newOrder.id} for level $playerLevel",
-      );
+      // Add the selected order to newOrders and remove it from availableOrders
+      // to prevent duplicates in this batch.
+      newOrders.add(availableOrders.removeAt(randomIndex));
     }
 
-    if (newlyAddedOrders.isNotEmpty) {
-      state = [...state, ...newlyAddedOrders];
-    } else {
+    if (newOrders.isNotEmpty) {
+      state = newOrders; // Replace the entire state with the new list
       print(
-        "[OrderNotifier] _fillOrderSlots: No more unique orders available for level $playerLevel.",
+        "[OrderNotifier] _fillOrderSlots: Set new active orders for level $playerLevel: ${newOrders.map((o) => o.id).toList()}",
+      );
+    } else {
+      state = []; // Clear orders if none are available for the new level
+      print(
+        "[OrderNotifier] _fillOrderSlots: No orders available for level $playerLevel. Clearing active orders.",
       );
     }
   }

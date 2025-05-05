@@ -62,11 +62,12 @@ Overhauling the UI, adding a Map Screen, and refining the Game Grid Screen based
     *   Modified the `Draggable` feedback and childWhenDragging to only show the item being dragged, leaving the base tile static.
 *   **Grid Dimensions:**
     *   Changed grid size constants (`rowCount`, `colCount`) in `lib/providers/grid_provider.dart` from 11x6 to 9x7.
-*   **Progression Overhaul:**
-    *   Leveling is now based on completing orders (`_totalOrdersPerLevel` in `player_provider.dart`). XP is decoupled.
-    *   `PlayerStats` model tracks `completedOrders` and `ordersForNextLevel`.
-    *   `PlayerStatsNotifier` handles order-based leveling via `orderCompleted()` and updated `_checkLevelUp`/`levelUp`.
-    *   `OrderNotifier` generates orders based on player level (`_ordersByLevel`) and calls `playerStatsNotifier.orderCompleted()`.
+*   **Progression Overhaul (Infrastructure-Based):**
+    *   Leveling is now triggered by maxing out the infrastructure upgrades for the current player level (`maxInfrastructureUpgrade` in `player_provider.dart`).
+    *   `PlayerStats` model tracks `infrastructureLevelsData`.
+    *   `PlayerStatsNotifier` handles infrastructure-based leveling via `upgradeInfrastructure`, `_checkPlayerLevelUp`, and `levelUp`.
+    *   XP is tracked but decoupled from leveling. Order completion grants rewards (coins, XP) but does not directly trigger level-ups.
+    *   `OrderNotifier` generates orders based on player level (`_ordersByLevel`) but does *not* call any leveling methods in `PlayerStatsNotifier`.
 *   **Initial Setup:**
     *   `GridNotifier` now places Camp (`🏕️`), Mine (`⛏️`), and Workshop (`🏭`) generators at fixed positions (4,1), (4,3), (4,5) during initialization.
     *   The manual spawn `FloatingActionButton` has been removed from `GameGridScreen`. Item generation relies on generators.
@@ -90,14 +91,14 @@ Overhauling the UI, adding a Map Screen, and refining the Game Grid Screen based
     *   **Crucial:** Populate `mergeItemsByEmoji` map in `lib/models/merge_trees.dart` with definitions for all planned items.
     *   Add more merge chains, generators, and orders (using the newly defined items).
     *   Define and add more unlockable zones/map areas.
-*   **Balancing:** Fine-tune order requirements, rewards, generator cooldowns/costs (cooldown currently disabled), and level-up order counts for the new progression system. Balance XP rewards if XP is kept for other purposes.
-*   **Testing:** Implement automated tests, especially for the new leveling, order systems, and UI interactions. Re-enable and test generator cooldowns.
+*   **Balancing:** Fine-tune order requirements, rewards, generator cooldowns/costs (cooldown currently disabled), and **infrastructure upgrade costs** for the progression system. Balance XP rewards if XP is kept for other purposes.
+*   **Testing:** Implement automated tests, especially for the **infrastructure-based leveling**, order systems, and UI interactions. Re-enable and test generator cooldowns.
 
 ## Active Decisions and Considerations
 
 *   **Shared UI Components:** The new Top HUD logic is currently only in `GameGridScreen` and needs to be added to `MapScreen` and potentially refactored.
 *   **Placeholders:** The UI currently uses placeholder emojis/icons. Bottom Info Bar text is dynamic but needs polish.
-*   **Leveling System:** The new order-based leveling system needs balancing. XP system is currently unused for leveling.
+*   **Leveling System:** The infrastructure-based leveling system needs balancing (upgrade costs vs. rewards). XP system is currently unused for leveling.
 *   **Generator Cooldowns:** Currently disabled for testing/simplicity. Need to be re-enabled and balanced.
 *   **Data Modeling:** (Existing consideration) Evaluate grid state storage efficiency.
 *   **Save Frequency:** (Existing consideration) Determine optimal save frequency.

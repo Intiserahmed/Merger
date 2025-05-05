@@ -3,8 +3,8 @@
 ## What Works
 
 *   **Core Gameplay Loop:** Generating items via initial generators (Camp, Mine, Workshop), merging (Plant `🌱` and Tool `🔧` sequences), and delivering items to fulfill orders is functional. Manual spawning is removed.
-*   **Leveling:** Leveling up is now based on completing a set number of orders per level (`_totalOrdersPerLevel` in `player_provider.dart`). Leveling up grants increased max energy. XP is tracked but currently decoupled from leveling.
-*   **Order System:** Orders are generated based on player level (`_ordersByLevel` in `order_provider.dart`), starting simple. Completing an order triggers the leveling check.
+*   **Leveling (Infrastructure-Based):** Leveling up is triggered by maxing out the infrastructure upgrades for the current player level (`maxInfrastructureUpgrade` in `player_provider.dart`). Leveling up grants increased max energy. XP is tracked but decoupled from leveling.
+*   **Order System:** Orders are generated based on player level (`_ordersByLevel` in `order_provider.dart`). Completing an order grants rewards (coins, XP) but does *not* trigger a leveling check.
 *   **Zone Unlocking:** Players can unlock new zones by meeting level and coin requirements (unchanged mechanism, but level is now tied to orders).
 *   **Persistence:** Game state (including order completion progress) is saved and loaded correctly using Isar. `build_runner` executed successfully after model changes.
 *   **UI Structure:**
@@ -31,7 +31,7 @@
 *   **Content Expansion:**
     *   **Crucial:** Populate `mergeItemsByEmoji` map in `lib/models/merge_trees.dart`.
     *   Add more merge chains, generators, orders, unlockable zones/map areas.
-*   **Balancing:** Fine-tune order requirements, rewards, generator cooldowns/costs (cooldown disabled), level-up order counts. Balance XP if kept.
+*   **Balancing:** Fine-tune order requirements, rewards, generator cooldowns/costs (cooldown disabled), and **infrastructure upgrade costs**. Balance XP if kept.
 *   **Testing:** Implement automated tests (leveling, orders, UI). Re-enable and test cooldowns.
 *   **Advanced Features:** Achievements, Quests, Social, etc.
 
@@ -53,4 +53,4 @@ The game now features two distinct merge sequences (Plants and Tools). The `Game
 
 *   **State Management:** Consistent use of Riverpod.
 *   **Persistence:** Consistent use of Isar.
-*   **UI:** Moved from basic emoji prototyping towards a more structured UI based on visual references. Replaced number-based merging with emoji-based merging (plant sequence). Added Gems as a player resource. Introduced a second merge sequence (Tools). Overhauled `GameGridScreen` UI based on specific design snippets, using placeholders initially. Changed grid dimensions to 9x7 and reduced tile size. **Refactored progression to be order-based, placed initial generators, and removed manual spawning.**
+*   **UI:** Moved from basic emoji prototyping towards a more structured UI based on visual references. Replaced number-based merging with emoji-based merging (plant sequence). Added Gems as a player resource. Introduced a second merge sequence (Tools). Overhauled `GameGridScreen` UI based on specific design snippets, using placeholders initially. Changed grid dimensions to 9x7 and reduced tile size. **Refactored progression to be infrastructure-based, placed initial generators, and removed manual spawning.**
