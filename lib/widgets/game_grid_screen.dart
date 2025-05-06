@@ -333,53 +333,7 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
         children: [
           // --- Top HUD ---
           const GameGridHud(), // Use the new widget
-          // --- Debug Buttons (Optional) ---
-          Row(
-            /* ... keep debug buttons if needed ... */
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.build, color: Colors.white54),
-                tooltip: 'Place Camp (Debug)',
-                onPressed:
-                    () => ref
-                        .read(grid.gridProvider.notifier)
-                        .placeGenerator(1, 1, '🏕️'),
-              ),
-              IconButton(
-                icon: const Icon(Icons.agriculture, color: Colors.white54),
-                tooltip: 'Place Mine (Debug)',
-                onPressed:
-                    () => ref
-                        .read(grid.gridProvider.notifier)
-                        .placeGenerator(2, 2, '⛏️'),
-              ),
-              IconButton(
-                icon: const Icon(Icons.factory, color: Colors.white54),
-                tooltip: 'Place Workshop (Debug)',
-                onPressed:
-                    () => ref
-                        .read(grid.gridProvider.notifier)
-                        .placeGenerator(3, 3, '🏭'),
-              ),
-              IconButton(
-                icon: const Icon(Icons.save, color: Colors.white54),
-                tooltip: 'Save Game State (Debug)',
-                onPressed: () async {
-                  final container = ProviderScope.containerOf(context);
-                  await GameService(isar, container).saveGame();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Game state saved!"),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
+          // --- Debug Buttons Row Removed ---
 
           // --- Order Display ---
           const GameGridOrders(), // Use the new widget
