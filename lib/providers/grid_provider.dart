@@ -585,10 +585,13 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       return;
     }
 
-    // 2. Check Energy Cost
+    // 2. Check Energy Cost (Hardcoded to 1)
     final playerNotifier = ref.read(playerStatsProvider.notifier);
-    if (!playerNotifier.spendEnergy(generatorTile.energyCost)) {
-      print("Not enough energy to activate generator at ($row, $col).");
+    if (!playerNotifier.spendEnergy(1)) {
+      // Always cost 1 energy
+      print(
+        "Not enough energy (cost 1) to activate generator at ($row, $col).",
+      );
       // Optional: Show feedback to user
       return;
     }
@@ -663,9 +666,9 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       );
       // Refund energy since item couldn't be placed
       playerNotifier.addEnergy(
-        generatorTile.energyCost,
+        1, // Refund 1 energy
       ); // Call the correct addEnergy method
-      print("Energy refunded.");
+      print("Energy (1) refunded.");
       // Optional: Show feedback to user
     }
   }
