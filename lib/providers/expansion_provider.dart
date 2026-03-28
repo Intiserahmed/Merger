@@ -5,6 +5,7 @@ import 'player_provider.dart'; // To watch player level
 
 // All unlockable zones. zone_starter is unlocked by default at game start.
 final List<TileUnlock> _allUnlockableTiles = [
+  // ── Starter region ─────────────────────────────────────────────────────
   TileUnlock(
     id: 'zone_starter',
     requiredLevel: 1,
@@ -12,20 +13,52 @@ final List<TileUnlock> _allUnlockableTiles = [
     coveredTiles: [],
   ),
   TileUnlock(
-    id: 'zone_beach_1',
+    id: 'zone_fishing',
     requiredLevel: 2,
-    unlockCostCoins: 100,
-    // Bottom-right corner — clear of all generators
+    unlockCostCoins: 80,
+    coveredTiles: [],
+  ),
+  TileUnlock(
+    id: 'zone_farmlands',
+    requiredLevel: 2,
+    unlockCostCoins: 80,
+    coveredTiles: [],
+  ),
+
+  // ── Coastal region ──────────────────────────────────────────────────────
+  TileUnlock(
+    id: 'zone_beach_1',
+    requiredLevel: 3,
+    unlockCostCoins: 150,
     coveredTiles: [
       Point(7, 4), Point(7, 5), Point(7, 6),
       Point(8, 4), Point(8, 5), Point(8, 6),
     ],
   ),
   TileUnlock(
+    id: 'zone_harbor',
+    requiredLevel: 4,
+    unlockCostCoins: 300,
+    coveredTiles: [],
+  ),
+  TileUnlock(
+    id: 'zone_coral_reef',
+    requiredLevel: 6,
+    unlockCostCoins: 550,
+    coveredTiles: [],
+  ),
+  TileUnlock(
+    id: 'zone_pirate_cove',
+    requiredLevel: 9,
+    unlockCostCoins: 1100,
+    coveredTiles: [],
+  ),
+
+  // ── Forest region ───────────────────────────────────────────────────────
+  TileUnlock(
     id: 'zone_forest_1',
     requiredLevel: 3,
-    unlockCostCoins: 250,
-    // Top-right corner
+    unlockCostCoins: 150,
     coveredTiles: [
       Point(0, 4), Point(0, 5), Point(0, 6),
       Point(1, 4), Point(1, 5), Point(1, 6),
@@ -33,26 +66,76 @@ final List<TileUnlock> _allUnlockableTiles = [
     ],
   ),
   TileUnlock(
+    id: 'zone_swamp',
+    requiredLevel: 4,
+    unlockCostCoins: 320,
+    coveredTiles: [],
+  ),
+  TileUnlock(
+    id: 'zone_mushroom',
+    requiredLevel: 5,
+    unlockCostCoins: 420,
+    coveredTiles: [],
+  ),
+  TileUnlock(
+    id: 'zone_treehouse',
+    requiredLevel: 7,
+    unlockCostCoins: 750,
+    coveredTiles: [],
+  ),
+
+  // ── Mountain / Mine region ──────────────────────────────────────────────
+  TileUnlock(
+    id: 'zone_ruins',
+    requiredLevel: 3,
+    unlockCostCoins: 200,
+    coveredTiles: [],
+  ),
+  TileUnlock(
     id: 'zone_mine_1',
     requiredLevel: 4,
     unlockCostCoins: 400,
-    // Right edge — skips (4,5) which is the Workshop generator
     coveredTiles: [
       Point(3, 5), Point(3, 6),
-      Point(4, 6),             // (4,5) is Workshop — skip it
+      Point(4, 6),
       Point(5, 5), Point(5, 6),
     ],
   ),
   TileUnlock(
+    id: 'zone_volcano',
+    requiredLevel: 6,
+    unlockCostCoins: 600,
+    coveredTiles: [],
+  ),
+
+  // ── Endgame region ───────────────────────────────────────────────────────
+  TileUnlock(
     id: 'zone_castle_1',
     requiredLevel: 5,
     unlockCostCoins: 600,
-    // Top-left corner — clear of all generators
     coveredTiles: [
       Point(0, 0), Point(0, 1), Point(0, 2),
       Point(1, 0), Point(1, 1), Point(1, 2),
       Point(2, 0), Point(2, 1), Point(2, 2),
     ],
+  ),
+  TileUnlock(
+    id: 'zone_glacier',
+    requiredLevel: 8,
+    unlockCostCoins: 900,
+    coveredTiles: [],
+  ),
+  TileUnlock(
+    id: 'zone_capital',
+    requiredLevel: 10,
+    unlockCostCoins: 1500,
+    coveredTiles: [],
+  ),
+  TileUnlock(
+    id: 'zone_dragon_lair',
+    requiredLevel: 10,
+    unlockCostCoins: 2500,
+    coveredTiles: [],
   ),
 ];
 
