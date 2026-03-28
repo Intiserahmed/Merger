@@ -193,6 +193,23 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     });
   }
 
+  void _assertValidState() {
+    assert(state.length <= 3,
+        'Order slots exceeded max (3): ${state.length} active');
+    assert(
+      state.map((o) => o.id).toSet().length == state.length,
+      'Duplicate order IDs in active state: ${state.map((o) => o.id).toList()}',
+    );
+    assert(
+      state.every((o) => o.requiredCount > 0),
+      'Order with zero or negative requiredCount found',
+    );
+    assert(
+      state.every((o) => o.rewardCoins >= 0),
+      'Order with negative rewardCoins found',
+    );
+  }
+
   // Generate initial orders based on the player's current level
   void _generateInitialOrders(int count) {
     final playerLevel = ref.read(playerStatsProvider).level;
@@ -203,14 +220,30 @@ class OrderNotifier extends StateNotifier<List<Order>> {
       final randomIndex = _random.nextInt(availableOrders.length);
       initialOrders.add(availableOrders.removeAt(randomIndex));
     }
-    state = initialOrders; // Set the initial state
+    state = initialOrders;
+    _assertValidState();
   }
 
-  // Helper to get orders *specifically* for the given player level.
+  // Fix 4: Cumulative pool — level 3 includes level 1+2+3 orders.
+  // Fix 1: No dedup against completed orders — same order can reappear after delivery.
+  //        Only excludes orders currently active (no duplicate simultaneous slots).
   List<Order> _getAvailableOrdersForLevel(int playerLevel) {
-    // Return only the orders defined for the exact level.
-    // Return an empty list if the level isn't defined or has no orders.
-    return List<Order>.from(_ordersByLevel[playerLevel] ?? []);
+    assert(playerLevel >= 1, 'Invalid playerLevel: $playerLevel');
+    // Clamp to the highest defined level so adding player levels without
+    // updating _ordersByLevel degrades gracefully instead of crashing.
+    final maxDefinedLevel = _ordersByLevel.keys.reduce((a, b) => a > b ? a : b);
+    final effectiveLevel = playerLevel.clamp(1, maxDefinedLevel);
+    assert(
+      effectiveLevel == playerLevel,
+      'No orders defined for level $playerLevel — add entries to _ordersByLevel. '
+      'Falling back to level $maxDefinedLevel pool.',
+    );
+    final pool = <Order>[];
+    for (int lvl = 1; lvl <= effectiveLevel; lvl++) {
+      pool.addAll(_ordersByLevel[lvl] ?? []);
+    }
+    assert(pool.isNotEmpty, 'Cumulative order pool is empty for level $effectiveLevel');
+    return pool;
   }
 
   /// Attempts to deliver items for a specific order.
@@ -221,71 +254,55 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     final gridNotifier = ref.read(gridProvider.notifier);
     final playerNotifier = ref.read(playerStatsProvider.notifier);
 
-    // 1. Count how many of the required item exist on the grid
-    int foundCount = 0;
-    List<Point<int>> itemLocations = []; // Store locations to remove later
+    // ── Phase 1: VALIDATE — read-only, no mutations ───────────────────────────
 
+    // Collect locations of required items
+    final itemLocations = <Point<int>>[];
     for (int r = 0; r < gridState.length; r++) {
       for (int c = 0; c < gridState[r].length; c++) {
-        final tile = gridState[r][c];
-        if (tile.itemImagePath == orderToDeliver.requiredItemId) {
-          foundCount++;
+        if (gridState[r][c].itemImagePath == orderToDeliver.requiredItemId) {
           itemLocations.add(Point(r, c));
         }
-        // Optional: Check overlayNumber if orders require specific tiers
-        // else if (tile.overlayNumber == orderToDeliver.requiredTier && tile.baseImagePath == orderToDeliver.requiredBase) { ... }
       }
     }
 
-    // 2. Check if enough items were found
-    if (foundCount >= orderToDeliver.requiredCount) {
-      print(
-        "Found $foundCount ${orderToDeliver.requiredItemId}(s). Delivering ${orderToDeliver.requiredCount}.",
-      );
-
-      // 3. Consume the required number of items from the grid
-      int consumedCount = 0;
-      for (final location in itemLocations) {
-        if (consumedCount < orderToDeliver.requiredCount) {
-          // Replace the item tile with an empty tile
-          const String defaultBase = '🟫'; // Default empty tile base
-          gridNotifier.updateTile(
-            location.x,
-            location.y,
-            // Add row/col to the empty tile data
-            TileData(
-              row: location.x,
-              col: location.y,
-              baseImagePath: defaultBase,
-            ),
-          );
-          consumedCount++;
-        } else {
-          break; // Stop consuming once requirement is met
-        }
-      }
-
-      // 4. Grant Rewards
-      playerNotifier.addCoins(orderToDeliver.rewardCoins);
-      // playerNotifier.addXp(orderToDeliver.rewardXp); // Keep XP separate for now
-      print(
-        "Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins.", // Removed XP from log
-      );
-
-      playerNotifier.orderCompleted();
-
-      // 5. Remove the completed order
-      state = state.where((order) => order.id != orderToDeliver.id).toList();
-
-      // 6. Add a new order immediately to replace the completed one
-      _maybeAddNewOrder();
-      return true;
-    } else {
-      print(
-        "Not enough items for order '${orderToDeliver.id}'. Found $foundCount, need ${orderToDeliver.requiredCount}.",
-      );
+    if (itemLocations.length < orderToDeliver.requiredCount) {
+      print("Not enough items for order '${orderToDeliver.id}'. "
+          "Found ${itemLocations.length}, need ${orderToDeliver.requiredCount}.");
       return false;
     }
+
+    // ── Phase 2: EXECUTE — all mutations run only after validation passes ─────
+
+    // 2a. Consume items — preserve each tile's original base colour
+    final toConsume = itemLocations.take(orderToDeliver.requiredCount);
+    for (final loc in toConsume) {
+      final original = gridState[loc.x][loc.y];
+      gridNotifier.updateTile(
+        loc.x, loc.y,
+        TileData(
+          row: loc.x,
+          col: loc.y,
+          baseImagePath: original.baseImagePath, // fix: keep base, not hardcoded 🟫
+        ),
+      );
+    }
+
+    // 2b. Grant rewards
+    playerNotifier.addCoins(orderToDeliver.rewardCoins);
+    print("Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins.");
+
+    // 2c. Remove completed order
+    state = state.where((o) => o.id != orderToDeliver.id).toList();
+    _assertValidState();
+
+    // 2d. Fill slot at CURRENT level — before orderCompleted() which may level up
+    _maybeAddNewOrder();
+    _assertValidState();
+
+    // 2e. Notify player last — may trigger level-up, banner shows after orders updated
+    playerNotifier.orderCompleted();
+    return true;
   }
 
   // Tries to add *one* new random order if slots are available, using the current level.
@@ -328,41 +345,23 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     }
   }
 
-  // Replaces the current orders with a fresh set based on the player's new level.
-  // Called after a level up is detected by the listener.
+  // On level-up: keeps existing orders and fills empty slots with
+  // orders from the now-expanded cumulative pool.
   void _fillOrderSlots() {
     const int maxActiveOrders = 3;
-    final playerLevel =
-        ref.read(playerStatsProvider).level; // Read the new level
-    print(
-      "[OrderNotifier] _fillOrderSlots: Refreshing orders for new level $playerLevel",
-    );
+    final playerLevel = ref.read(playerStatsProvider).level;
+    print("[OrderNotifier] _fillOrderSlots: Filling slots for level $playerLevel");
 
-    final availableOrders = _getAvailableOrdersForLevel(playerLevel);
-    final List<Order> newOrders = [];
-
-    final int ordersToGenerate = min(maxActiveOrders, availableOrders.length);
-    for (int i = 0; i < ordersToGenerate; i++) {
-      if (availableOrders.isEmpty) break;
-      final randomIndex = _random.nextInt(availableOrders.length);
-      final newOrder = availableOrders.removeAt(randomIndex);
-      newOrders.add(newOrder);
-      print(
-        "[OrderNotifier] _fillOrderSlots: Adding new order ${newOrder.id} for level $playerLevel",
-      );
+    while (state.length < maxActiveOrders) {
+      final pool = _getAvailableOrdersForLevel(playerLevel);
+      final activeIds = state.map((o) => o.id).toSet();
+      pool.removeWhere((o) => activeIds.contains(o.id));
+      if (pool.isEmpty) break;
+      final pick = pool[_random.nextInt(pool.length)];
+      state = [...state, pick];
+      print("[OrderNotifier] _fillOrderSlots: Added ${pick.id}");
     }
-
-    if (newOrders.isNotEmpty) {
-      state = newOrders; // Replace the entire state with the new list
-      print(
-        "[OrderNotifier] _fillOrderSlots: Set new active orders for level $playerLevel: ${newOrders.map((o) => o.id).toList()}",
-      );
-    } else {
-      state = []; // Clear orders if none are available for the new level
-      print(
-        "[OrderNotifier] _fillOrderSlots: No orders available for level $playerLevel. Clearing active orders.",
-      );
-    }
+    _assertValidState();
   }
 
   // ── Debug helpers (never call from prod code) ──────────────────────────────

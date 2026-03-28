@@ -13,7 +13,6 @@ import 'expansion_provider.dart'; // Import expansion provider
 
 // --- Constants ---
 // Keep emojis/constants potentially used outside generator/merge logic
-const String swordEmoji = '⚔️';
 const String coinEmoji = '💰';
 const String lockedEmoji = '🔒';
 const String defaultEmptyBase = '🟫';
@@ -29,9 +28,9 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
   // Initialize the grid in the constructor by calling the non-static helper
   GridNotifier(this.ref) : super([]) {
-    // Initialize state after construction to access ref
     state = _initializeGridData();
-    _watchUnlocks(); // Start listening for zone unlocks
+    _assertValidGrid();
+    _watchUnlocks();
   }
 
   // --- Initialization Logic (Now Non-Static) ---
@@ -54,12 +53,10 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     // Define Emojis (Makes it easy to change later)
     const String sand = '🟫'; // Brown Square for Sand
     const String grass = '🟩'; // Green Square for Grass
-    const String shell = '🐚';
-    const String castle = '🏰';
     const String coins = '💰'; // Using Money Bag for coins item
-    const String photo = '🖼️';
-    const String star = '⭐';
-    const String sword = '⚔️'; // Keeping sword as per previous code
+    // Starter items — must be in a merge chain
+    const String plantBase = '🌱'; // plant chain tier 1
+    const String pebbleBase = '🪨'; // pebble chain tier 1
 
     return List.generate(rowCount, (row) {
       return List.generate(colCount, (col) {
@@ -135,82 +132,37 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
           }
         }
 
-        // --- Existing Specific Items (Ensure they don't conflict with generators) ---
-        if (row == 3 && col == 2)
+        // --- Starter Items (all in valid merge chains) ---
+        // Two 🌱 near Camp (4,1) — player can merge them immediately
+        if (row == 4 && col == 2)
           return TileData(
-            row: row,
-            col: col,
+            row: row, col: col,
             type: TileType.item,
             baseImagePath: sand,
-            itemImagePath: photo,
-          ); // Photo item
-        if (row == 4 && col == 1)
+            itemImagePath: plantBase,
+          );
+        if (row == 5 && col == 1)
           return TileData(
-            row: row,
-            col: col,
+            row: row, col: col,
             type: TileType.item,
             baseImagePath: sand,
-            itemImagePath: castle,
-          ); // Castle item
-        // Removed item at 4,1 (Camp)
-        if (row == 4 && col == 2) // Keep item next to Camp
+            itemImagePath: plantBase,
+          );
+        // Two 🪨 near Mine (4,3) — player can merge them immediately
+        if (row == 4 && col == 4)
           return TileData(
-            row: row,
-            col: col,
+            row: row, col: col,
             type: TileType.item,
             baseImagePath: sand,
-            itemImagePath: sword,
-          ); // Sword item
-        // Removed item at 4,3 (Mine)
-        if (row == 4 && col == 4) // Keep item next to Mine
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            itemImagePath: castle,
-          ); // Castle item
-        // Removed item at 4,5 (Workshop)
-        if (row == 5 && col == 1) // Keep item below Camp
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            itemImagePath: shell,
-          ); // Shell item
+            itemImagePath: pebbleBase,
+          );
         if (row == 5 && col == 2)
           return TileData(
-            row: row,
-            col: col,
+            row: row, col: col,
             type: TileType.item,
             baseImagePath: sand,
-            itemImagePath: shell,
-          ); // Shell item
-        if (row == 6 && col == 1)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            itemImagePath: castle,
-          ); // Castle item
-        if (row == 6 && col == 2)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            itemImagePath: castle,
-          ); // Castle item
-        if (row == 7 && col == 0)
-          return TileData(
-            row: row,
-            col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            itemImagePath: photo,
-          ); // Photo item
+            itemImagePath: pebbleBase,
+          );
 
         // Define grassy areas
         if ((row == 1 && col == 3) ||
@@ -232,6 +184,41 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         );
       });
     });
+  }
+
+  void _assertValidGrid() {
+    assert(state.length == rowCount,
+        'Grid row count mismatch: expected $rowCount, got ${state.length}');
+    assert(
+      state.every((row) => row.length == colCount),
+      'Grid column count mismatch: expected $colCount cols in every row',
+    );
+    assert(
+      state.every((row) => row.every((t) => t.row >= 0 && t.col >= 0)),
+      'Tile found with unset row/col (-1)',
+    );
+    assert(
+      state.every((row) => row.every((t) =>
+          !t.isGenerator || t.generatesItemPath != null)),
+      'Generator tile found with null generatesItemPath',
+    );
+    // Every generator must have at least one non-locked adjacent tile at init
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < colCount; c++) {
+        if (state[r][c].isGenerator) {
+          final adjacents = [
+            if (r > 0) state[r - 1][c],
+            if (r < rowCount - 1) state[r + 1][c],
+            if (c > 0) state[r][c - 1],
+            if (c < colCount - 1) state[r][c + 1],
+          ];
+          assert(
+            adjacents.any((t) => !t.isLocked && !t.isGenerator),
+            'Generator at ($r,$c) has no unlocked adjacent tile — it can never spawn',
+          );
+        }
+      }
+    }
   }
 
   // --- Watch for Unlocks ---
@@ -297,13 +284,26 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
   /// Merges the dragged item onto the target tile.
   void mergeTiles(int targetRow, int targetCol, int sourceRow, int sourceCol) {
-    final currentGrid = state; // Get the current state
+    assert(targetRow >= 0 && targetRow < rowCount, 'targetRow out of bounds: $targetRow');
+    assert(targetCol >= 0 && targetCol < colCount, 'targetCol out of bounds: $targetCol');
+    assert(sourceRow >= 0 && sourceRow < rowCount, 'sourceRow out of bounds: $sourceRow');
+    assert(sourceCol >= 0 && sourceCol < colCount, 'sourceCol out of bounds: $sourceCol');
+    assert(
+      !(targetRow == sourceRow && targetCol == sourceCol),
+      'mergeTiles called with same source and target ($targetRow,$targetCol)',
+    );
 
-    // Ensure tiles are valid for merging (using current state)
+    final currentGrid = state;
     final targetTile = currentGrid[targetRow][targetCol];
     final sourceTile = currentGrid[sourceRow][sourceCol];
 
-    // Prevent merging onto or dragging from locked tiles
+    assert(targetTile.itemImagePath != null,
+        'mergeTiles: target ($targetRow,$targetCol) has no item');
+    assert(sourceTile.itemImagePath != null,
+        'mergeTiles: source ($sourceRow,$sourceCol) has no item');
+    assert(targetTile.itemImagePath == sourceTile.itemImagePath,
+        'mergeTiles: items do not match — ${targetTile.itemImagePath} vs ${sourceTile.itemImagePath}');
+
     if (targetTile.isLocked || sourceTile.isLocked) {
       print("Cannot merge with locked tiles.");
       return;
@@ -584,33 +584,17 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       return;
     }
 
-    // 2. Check Energy Cost (Hardcoded to 1)
-    final playerNotifier = ref.read(playerStatsProvider.notifier);
-    if (!playerNotifier.spendEnergy(1)) {
-      // Always cost 1 energy
-      print(
-        "Not enough energy (cost 1) to activate generator at ($row, $col).",
-      );
-      // Optional: Show feedback to user
-      return;
-    }
-
-    // 3. Find Adjacent Empty Tile (that isn't locked)
+    // 2. Find Adjacent Empty Tile BEFORE spending energy (atomicity fix:
+    //    never spend energy if there's nowhere to place the item).
     int? targetRow, targetCol;
-    // Use the Point class from tile_unlock.dart (no type arguments)
     final List<Point> neighbors = [
       Point(row - 1, col), Point(row + 1, col),
       Point(row, col - 1), Point(row, col + 1),
-      // Optional: Add diagonals if desired
-      // Point(row - 1, col - 1), Point(row - 1, col + 1),
-      // Point(row + 1, col - 1), Point(row + 1, col + 1),
     ];
 
     for (final neighbor in neighbors) {
-      // Use .row and .col instead of .x and .y
       final r = neighbor.row;
       final c = neighbor.col;
-      // Check bounds and if the tile is empty AND not locked
       if (r >= 0 &&
           r < rowCount &&
           c >= 0 &&
@@ -618,58 +602,57 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
           currentGrid[r][c].type == TileType.empty) {
         targetRow = r;
         targetCol = c;
-        break; // Found the first suitable neighbor
+        break;
       }
     }
 
-    // 4. Spawn Item if Empty Neighbor Found
-    if (targetRow != null && targetCol != null) {
-      // Create the spawned item tile data
-      final spawnedItemData = TileData(
-        row: targetRow,
-        col: targetCol, // Add row/col
-        type: TileType.item,
-        baseImagePath:
-            currentGrid[targetRow][targetCol].baseImagePath, // Keep base
-        itemImagePath: generatorTile.generatesItemPath!,
-        overlayNumber: 0, // Base items usually start at 0 or 1
-      );
-
-      // Create updated generator tile data (with new timestamp)
-      final updatedGeneratorData = TileData(
-        row: row,
-        col: col, // Add row/col
-        type: generatorTile.type,
-        baseImagePath: generatorTile.baseImagePath,
-        itemImagePath: generatorTile.itemImagePath,
-        overlayNumber: generatorTile.overlayNumber,
-        generatesItemPath: generatorTile.generatesItemPath,
-        cooldownSeconds: generatorTile.cooldownSeconds,
-        lastUsedTimestamp: DateTime.now(), // Set activation time
-        energyCost: generatorTile.energyCost,
-      );
-
-      // Update the grid state
-      final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
-      newGrid[targetRow][targetCol] = spawnedItemData; // Place the item
-      newGrid[row][col] =
-          updatedGeneratorData; // Update the generator timestamp
-      state = newGrid;
-
-      print(
-        "Generator at ($row, $col) activated, spawned ${generatorTile.generatesItemPath} at ($targetRow, $targetCol).",
-      );
-    } else {
+    if (targetRow == null || targetCol == null) {
       print(
         "No empty, unlocked adjacent tile found for generator at ($row, $col).",
       );
-      // Refund energy since item couldn't be placed
-      playerNotifier.addEnergy(
-        1, // Refund 1 energy
-      ); // Call the correct addEnergy method
-      print("Energy (1) refunded.");
-      // Optional: Show feedback to user
+      return; // No energy spent — nothing happened.
     }
+
+    // 3. Spend energy only after confirming a spawn tile exists.
+    final playerNotifier = ref.read(playerStatsProvider.notifier);
+    if (!playerNotifier.spendEnergy(1)) {
+      print(
+        "Not enough energy (cost 1) to activate generator at ($row, $col).",
+      );
+      return;
+    }
+
+    // 4. Spawn Item
+    final spawnedItemData = TileData(
+      row: targetRow,
+      col: targetCol,
+      type: TileType.item,
+      baseImagePath: currentGrid[targetRow][targetCol].baseImagePath,
+      itemImagePath: generatorTile.generatesItemPath!,
+      overlayNumber: 0,
+    );
+
+    final updatedGeneratorData = TileData(
+      row: row,
+      col: col,
+      type: generatorTile.type,
+      baseImagePath: generatorTile.baseImagePath,
+      itemImagePath: generatorTile.itemImagePath,
+      overlayNumber: generatorTile.overlayNumber,
+      generatesItemPath: generatorTile.generatesItemPath,
+      cooldownSeconds: generatorTile.cooldownSeconds,
+      lastUsedTimestamp: DateTime.now(),
+      energyCost: generatorTile.energyCost,
+    );
+
+    final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
+    newGrid[targetRow][targetCol] = spawnedItemData;
+    newGrid[row][col] = updatedGeneratorData;
+    state = newGrid;
+
+    print(
+      "Generator at ($row, $col) activated, spawned ${generatorTile.generatesItemPath} at ($targetRow, $targetCol).",
+    );
   }
 
   /// Moves an item from one tile to another.
@@ -785,6 +768,15 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       }
     }
     state = newGrid;
+  }
+
+  // ── Persistence ────────────────────────────────────────────────────────────
+
+  /// Load a previously saved grid. Runs the same invariant checks as init
+  /// so corrupt saves are caught immediately in debug builds.
+  void loadGrid(List<List<TileData>> loadedGrid) {
+    state = loadedGrid;
+    _assertValidGrid();
   }
 
   void debugReset() => state = _initializeGridData();

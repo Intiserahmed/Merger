@@ -238,14 +238,11 @@ void main() {
       expect(c.read(playerStatsProvider).xp, greaterThan(xpBefore));
     });
 
-    test('mergeTiles: different items — no merge, tiles unchanged', () {
+    test('mergeTiles: different items — assert fires (programmer error, UI must guard)', () {
       final n = c.read(gridProvider.notifier);
       n.updateTile(6, 0, item(6, 0, '🌱'));
       n.updateTile(6, 1, item(6, 1, '🪨'));
-      n.mergeTiles(6, 0, 6, 1);
-      final g = c.read(gridProvider);
-      expect(g[6][0].itemImagePath, '🌱');
-      expect(g[6][1].itemImagePath, '🪨');
+      expect(() => n.mergeTiles(6, 0, 6, 1), throwsA(isA<AssertionError>()));
     });
 
     test('mergeTiles: max-level items (🎋) — no merge', () {
@@ -297,7 +294,7 @@ void main() {
       expect(c.read(playerStatsProvider).energy, energyBefore - 1);
     });
 
-    test('activateGenerator: refunds energy when no adjacent empty tile', () {
+    test('activateGenerator: never spends energy when no adjacent empty tile', () {
       final n = c.read(gridProvider.notifier);
       // Block all four neighbours of Camp (4,1)
       n.updateTile(3, 1, item(3, 1, '🌱'));
@@ -320,6 +317,14 @@ void main() {
       c = ProviderContainer();
       c.read(gridProvider);
       c.read(orderProvider);
+      // Clear the four starter items so delivery tests start with a clean grid.
+      // Starter items (🌱 at 4,2/5,1 and 🪨 at 4,4/5,2) would otherwise be
+      // picked up by delivery scans before the test-placed items.
+      final n = c.read(gridProvider.notifier);
+      n.updateTile(4, 2, empty(4, 2));
+      n.updateTile(5, 1, empty(5, 1));
+      n.updateTile(4, 4, empty(4, 4));
+      n.updateTile(5, 2, empty(5, 2));
     });
     tearDown(() => c.dispose());
 
@@ -357,13 +362,21 @@ void main() {
       for (var i = 0; i < order.requiredCount; i++) {
         gn.updateTile(6, i, item(6, i, order.requiredItemId));
       }
-      c.read(orderProvider.notifier).attemptDelivery(order);
-      final g = c.read(gridProvider);
-      int remaining = 0;
-      for (var i = 0; i < order.requiredCount; i++) {
-        if (g[6][i].itemImagePath == order.requiredItemId) remaining++;
+      // Count matching items across entire grid before delivery
+      int countBefore = 0;
+      for (final row in c.read(gridProvider)) {
+        for (final tile in row) {
+          if (tile.itemImagePath == order.requiredItemId) countBefore++;
+        }
       }
-      expect(remaining, 0);
+      c.read(orderProvider.notifier).attemptDelivery(order);
+      int countAfter = 0;
+      for (final row in c.read(gridProvider)) {
+        for (final tile in row) {
+          if (tile.itemImagePath == order.requiredItemId) countAfter++;
+        }
+      }
+      expect(countAfter, countBefore - order.requiredCount);
     });
 
     test('attemptDelivery: delivery confirmed + order slot refilled (≤3 orders)', () {
@@ -387,6 +400,75 @@ void main() {
         c.read(orderProvider).any((o) => o.id == order.id),
         isTrue, // order still active
       );
+    });
+
+    // ── Atomicity: partial delivery must be impossible ────────────────────────
+    test('atomicity: 1 item present but order needs 2 — nothing consumed, no reward', () {
+      final order = c.read(orderProvider).firstWhere((o) => o.requiredCount >= 2);
+      final gn = c.read(gridProvider.notifier);
+      // Place only ONE of the required items (one short)
+      gn.updateTile(6, 0, item(6, 0, order.requiredItemId));
+
+      final coinsBefore = c.read(playerStatsProvider).coins;
+      final result = c.read(orderProvider.notifier).attemptDelivery(order);
+
+      expect(result, isFalse);
+      expect(c.read(playerStatsProvider).coins, coinsBefore); // no reward
+      // The single item placed must still be on the grid
+      expect(c.read(gridProvider)[6][0].itemImagePath, order.requiredItemId);
+    });
+
+    // ── Cumulative order pool ────────────────────────────────────────────────
+    test('cumulative pool: level-1 orders can still be delivered at level 2', () {
+      final gn = c.read(gridProvider.notifier);
+      final on = c.read(orderProvider.notifier);
+
+      // Level up to 2 by completing 3 orders
+      for (int i = 0; i < 3; i++) {
+        final o = c.read(orderProvider).first;
+        for (var j = 0; j < o.requiredCount; j++) {
+          gn.updateTile(7, j, item(7, j, o.requiredItemId));
+        }
+        on.attemptDelivery(o);
+      }
+      expect(c.read(playerStatsProvider).level, 2);
+
+      // A level-1 order (e.g. 2×🌱) must still be deliverable from the pool
+      const lvl1Item = '🌱';
+      const lvl1Count = 2;
+      for (var i = 0; i < lvl1Count; i++) {
+        gn.updateTile(6, i, item(6, i, lvl1Item));
+      }
+      final lvl1Order = c.read(orderProvider).firstWhere(
+        (o) => o.requiredItemId == lvl1Item && o.requiredCount == lvl1Count,
+        orElse: () => throw StateError(
+          'Level-1 plant order not in pool at level 2 — cumulative pool broken',
+        ),
+      );
+      final coinsBefore = c.read(playerStatsProvider).coins;
+      on.attemptDelivery(lvl1Order);
+      expect(c.read(playerStatsProvider).coins, greaterThan(coinsBefore));
+    });
+
+    // ── Exact level-up boundary ──────────────────────────────────────────────
+    test('level boundary: 2nd order does not level up, 3rd does', () {
+      final gn = c.read(gridProvider.notifier);
+      final on = c.read(orderProvider.notifier);
+
+      void deliverNext(int row) {
+        final o = c.read(orderProvider).first;
+        for (var i = 0; i < o.requiredCount; i++) {
+          gn.updateTile(row, i, item(row, i, o.requiredItemId));
+        }
+        on.attemptDelivery(o);
+      }
+
+      deliverNext(6);
+      expect(c.read(playerStatsProvider).level, 1); // still level 1 after 1
+      deliverNext(6);
+      expect(c.read(playerStatsProvider).level, 1); // still level 1 after 2
+      deliverNext(6);
+      expect(c.read(playerStatsProvider).level, 2); // level 2 after 3rd
     });
   });
 

@@ -24,18 +24,21 @@ const Map<int, int> infrastructureUpgradeCost = {
 const int maxPlayerLevel = 5;
 
 // --- Order-based level thresholds (cumulative) ---
+// Keys: the level being entered. Max key must equal maxPlayerLevel.
+// No key beyond maxPlayerLevel — _checkOrderLevelUp guards against it.
 const Map<int, int> _totalOrdersPerLevel = {
   2: 3,
   3: 8,
   4: 15,
   5: 25,
-  6: 40,
 };
 
 class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
   final Ref ref;
   Timer? _energyRegenTimer;
   late final AppLifecycleListener _lifecycleListener;
+
+  bool _levelingUp = false;
 
   PlayerStatsNotifier(this.ref) : super(PlayerStats()) {
     _startEnergyRegeneration();
@@ -70,47 +73,71 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
 
   // ── Stat mutations ─────────────────────────────────────────────────────────
 
+  void _assertValidState() {
+    assert(state.level >= 1 && state.level <= maxPlayerLevel,
+        'Level out of bounds: ${state.level}');
+    assert(state.energy >= 0, 'Energy went negative: ${state.energy}');
+    assert(state.energy <= state.maxEnergy,
+        'Energy ${state.energy} exceeds maxEnergy ${state.maxEnergy}');
+    assert(state.coins >= 0, 'Coins went negative: ${state.coins}');
+    assert(state.gems >= 0, 'Gems went negative: ${state.gems}');
+    assert(state.completedOrders >= 0,
+        'completedOrders went negative: ${state.completedOrders}');
+    assert(state.maxEnergy >= 20,
+        'maxEnergy dropped below starting value: ${state.maxEnergy}');
+  }
+
   void addXp(int amount) {
+    assert(amount >= 0, 'addXp called with negative amount: $amount');
     state = state.copyWith(xp: state.xp + amount);
   }
 
   bool spendEnergy(int amount) {
+    assert(amount > 0, 'spendEnergy called with non-positive amount: $amount');
     if (state.energy < amount) {
       print('Not enough energy!');
       return false;
     }
     state = state.copyWith(energy: state.energy - amount);
+    assert(state.energy >= 0, 'Energy went negative after spend');
     return true;
   }
 
   void addEnergy(int amount) {
+    assert(amount >= 0, 'addEnergy called with negative amount: $amount');
     state = state.copyWith(
       energy: (state.energy + amount).clamp(0, state.maxEnergy),
     );
   }
 
   void addCoins(int amount) {
+    assert(amount >= 0, 'addCoins called with negative amount: $amount');
     state = state.copyWith(coins: state.coins + amount);
   }
 
   void spendCoins(int amount) {
+    assert(amount > 0, 'spendCoins called with non-positive amount: $amount');
     if (state.coins < amount) {
       print('Not enough coins!');
       return;
     }
     state = state.copyWith(coins: state.coins - amount);
+    assert(state.coins >= 0, 'Coins went negative after spend');
   }
 
   void addGems(int amount) {
+    assert(amount >= 0, 'addGems called with negative amount: $amount');
     state = state.copyWith(gems: state.gems + amount);
   }
 
   bool spendGems(int amount) {
+    assert(amount > 0, 'spendGems called with non-positive amount: $amount');
     if (state.gems < amount) {
       print('Not enough gems!');
       return false;
     }
     state = state.copyWith(gems: state.gems - amount);
+    assert(state.gems >= 0, 'Gems went negative after spend');
     return true;
   }
 
@@ -150,25 +177,18 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
     }
 
     state = state.copyWith(infrastructureLevelsData: newInfrastructureData);
-
     print('Upgraded infrastructure for level $levelToUpgrade to $newUpgradeLevel for $cost coins.');
-    _checkPlayerLevelUp();
+    // Fix 3: Infrastructure no longer triggers level-up.
+    //        Single level-up path: order completion only (_checkOrderLevelUp).
     return true;
-  }
-
-  void _checkPlayerLevelUp() {
-    final currentLevel = state.level;
-    if (currentLevel >= maxPlayerLevel) return;
-    final currentLevelInfraUpgrade = state.infrastructureLevels[currentLevel] ?? 0;
-    if (currentLevelInfraUpgrade >= maxInfrastructureUpgrade) {
-      levelUp();
-    }
   }
 
   // ── Order-based levelling ──────────────────────────────────────────────────
 
   void orderCompleted() {
+    assert(state.level >= 1, 'orderCompleted called with invalid level');
     state = state.copyWith(completedOrders: state.completedOrders + 1);
+    _assertValidState();
     _checkOrderLevelUp();
   }
 
@@ -184,11 +204,13 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
   // ── Level up ───────────────────────────────────────────────────────────────
 
   void levelUp() {
+    assert(!_levelingUp, 'levelUp called while already leveling up — two systems racing');
     final currentLevel = state.level;
     if (currentLevel >= maxPlayerLevel) {
       print('Already at max player level ($maxPlayerLevel).');
       return;
     }
+    _levelingUp = true;
 
     final nextLevel = currentLevel + 1;
     final newMaxEnergy = state.maxEnergy + 10;
@@ -205,6 +227,10 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       infrastructureLevelsData: newInfrastructureData,
       ordersForNextLevel: nextTarget,
     );
+    _levelingUp = false;
+    _assertValidState();
+    assert(state.level == currentLevel + 1,
+        'Level did not increment correctly: was $currentLevel, now ${state.level}');
     print('Level Up! Reached level ${state.level}. Max energy: ${state.maxEnergy}.');
   }
 

@@ -66,6 +66,7 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen>
   // ── Drag helpers ───────────────────────────────────────────────────────
 
   void _startItemDrag(int row, int col, Offset globalPos) {
+    if (_isDragging) return; // multi-touch guard: ignore second finger
     final gridData = ref.read(grid.gridProvider);
     if (row >= gridData.length || col >= gridData[0].length) return;
     final tile = gridData[row][col];

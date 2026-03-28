@@ -15,6 +15,18 @@ class GameService {
 
   GameService(this.isar, this.container);
 
+  // --- Load validation ---
+  // Returns null when the saved stats look sane; a reason string when corrupt.
+  String? _validateStats(PlayerStats s) {
+    if (s.level < 1 || s.level > maxPlayerLevel) return 'level out of range: ${s.level}';
+    if (s.coins < 0) return 'negative coins: ${s.coins}';
+    if (s.gems < 0) return 'negative gems: ${s.gems}';
+    if (s.energy < 0 || s.energy > s.maxEnergy) return 'energy out of range: ${s.energy}/${s.maxEnergy}';
+    if (s.maxEnergy < 20) return 'maxEnergy too low: ${s.maxEnergy}';
+    if (s.completedOrders < 0) return 'negative completedOrders: ${s.completedOrders}';
+    return null;
+  }
+
   // --- Load Game State ---
   Future<void> loadGame() async {
     print("Attempting to load game state...");
@@ -24,12 +36,17 @@ class GameService {
       Isar.autoIncrement,
     ); // Assuming only one entry
     if (savedStats != null) {
-      print(
-        "Loaded PlayerStats: Level ${savedStats.level}, Coins ${savedStats.coins}",
-      );
-      // Update the provider state
-      container.read(playerStatsProvider.notifier).loadStats(savedStats);
-      // Also update the derived unlockedStatusProvider implicitly via playerStatsProvider
+      final problem = _validateStats(savedStats);
+      if (problem != null) {
+        print("Saved PlayerStats corrupt ($problem). Discarding and using defaults.");
+        // Leave the provider at its default state; corrupt save will be
+        // overwritten on the next saveGame() call.
+      } else {
+        print(
+          "Loaded PlayerStats: Level ${savedStats.level}, Coins ${savedStats.coins}",
+        );
+        container.read(playerStatsProvider.notifier).loadStats(savedStats);
+      }
     } else {
       print("No saved PlayerStats found, using defaults.");
       // Initialize with default if no save exists (already handled by provider default)
@@ -63,10 +80,8 @@ class GameService {
       }
 
       if (gridValid) {
-        // Directly set the state of the GridNotifier
-        // Note: This bypasses the GridNotifier's initialization logic,
-        // ensure loaded state is consistent or re-run init logic if needed.
-        container.read(gridProvider.notifier).state = loadedGrid;
+        // Route through loadGrid() so _assertValidGrid() runs in debug builds.
+        container.read(gridProvider.notifier).loadGrid(loadedGrid);
         print("Grid state loaded successfully.");
       } else {
         print("Grid state potentially corrupted, using default grid.");
