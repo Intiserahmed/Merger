@@ -21,7 +21,7 @@ const Map<int, int> infrastructureUpgradeCost = {
   4: 25,
   5: 30,
 };
-const int maxPlayerLevel = 5;
+const int maxPlayerLevel = 10;
 
 // --- Order-based level thresholds (cumulative) ---
 // Keys: the level being entered. Max key must equal maxPlayerLevel.
@@ -31,6 +31,11 @@ const Map<int, int> _totalOrdersPerLevel = {
   3: 8,
   4: 15,
   5: 25,
+  6: 40,
+  7: 60,
+  8: 85,
+  9: 115,
+  10: 155,
 };
 
 class PlayerStatsNotifier extends StateNotifier<PlayerStats> {

@@ -23,6 +23,14 @@ const String mineEmoji =
 const int rowCount = 9; // New: 9 rows
 const int colCount = 7; // New: 7 columns
 
+// Generators that auto-place on the grid when the player reaches a given level.
+// Each entry: level → list of (row, col, generatorEmoji).
+const Map<int, List<(int, int, String)>> _generatorUnlocksByLevel = {
+  4: [(1, 5, '💎')],  // Gem Grotto — in forest zone (unlocks level 3)
+  6: [(8, 0, '🌾')],  // Farm — bottom-left, always accessible
+  8: [(0, 1, '⚗️')],  // Alchemy Lab — in castle zone (unlocks level 5)
+};
+
 class GridNotifier extends StateNotifier<List<List<TileData>>> {
   final Ref ref; // Add ref to access other providers
 
@@ -31,6 +39,7 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     state = _initializeGridData();
     _assertValidGrid();
     _watchUnlocks();
+    _watchLevelForGenerators();
   }
 
   // --- Initialization Logic (Now Non-Static) ---
@@ -57,6 +66,7 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     // Starter items — must be in a merge chain
     const String plantBase = '🌱'; // plant chain tier 1
     const String pebbleBase = '🪨'; // pebble chain tier 1
+    const String toolBase = '🔧'; // tool chain tier 1
 
     return List.generate(rowCount, (row) {
       return List.generate(colCount, (col) {
@@ -149,19 +159,37 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             itemImagePath: plantBase,
           );
         // Two 🪨 near Mine (4,3) — player can merge them immediately
-        if (row == 4 && col == 4)
-          return TileData(
-            row: row, col: col,
-            type: TileType.item,
-            baseImagePath: sand,
-            itemImagePath: pebbleBase,
-          );
+        // (4,4) left empty so Workshop at (4,5) can spawn 🔧 there)
         if (row == 5 && col == 2)
           return TileData(
             row: row, col: col,
             type: TileType.item,
             baseImagePath: sand,
             itemImagePath: pebbleBase,
+          );
+        if (row == 5 && col == 4)
+          return TileData(
+            row: row, col: col,
+            type: TileType.item,
+            baseImagePath: sand,
+            itemImagePath: pebbleBase,
+          );
+        // Two 🔧 near Workshop (4,5) — (3,5)/(5,5)/(4,6) are locked by zone_mine_1
+        // so (4,4) is Workshop's only free spawn tile — keep it empty above.
+        // Place starters at (3,4) and (5,4) so player has tool items to work with.
+        if (row == 3 && col == 4)
+          return TileData(
+            row: row, col: col,
+            type: TileType.item,
+            baseImagePath: sand,
+            itemImagePath: toolBase,
+          );
+        if (row == 6 && col == 4)
+          return TileData(
+            row: row, col: col,
+            type: TileType.item,
+            baseImagePath: sand,
+            itemImagePath: toolBase,
           );
 
         // Define grassy areas
@@ -278,6 +306,38 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       state = newGrid;
       print("Grid updated for unlocked zone: ${zone.id}");
     }
+  }
+
+  // Auto-place generators when the player reaches the required level.
+  void _watchLevelForGenerators() {
+    ref.listen<int>(
+      playerStatsProvider.select((s) => s.level),
+      (previous, newLevel) {
+        final toPlace = _generatorUnlocksByLevel[newLevel];
+        if (toPlace == null) return;
+        final currentGrid = state;
+        final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
+        bool changed = false;
+        for (final (row, col, emoji) in toPlace) {
+          if (row < 0 || row >= rowCount || col < 0 || col >= colCount) continue;
+          if (newGrid[row][col].type == TileType.locked) continue; // zone not unlocked yet
+          final config = generatorConfigs[emoji];
+          if (config == null) continue;
+          newGrid[row][col] = TileData(
+            row: row,
+            col: col,
+            type: TileType.generator,
+            baseImagePath: emoji,
+            generatesItemPath: mergeTrees[config.sequenceId]?.first,
+            cooldownSeconds: config.cooldown,
+            energyCost: config.energyCost,
+          );
+          changed = true;
+          print('Generator $emoji placed at ($row, $col) on reaching level $newLevel.');
+        }
+        if (changed) state = newGrid;
+      },
+    );
   }
 
   // --- Methods to Modify State ---

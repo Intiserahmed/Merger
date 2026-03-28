@@ -12,162 +12,72 @@ import 'player_provider.dart'; // Need PlayerStatsProvider
 // Keep orders simple for early levels, using items from initial generators.
 final Map<int, List<Order>> _ordersByLevel = {
   1: [
-    // Orders available at Level 1
-    Order(
-      id: 'lvl1_plant_1',
-      requiredItemId: '🌱',
-      requiredCount: 2,
-      rewardCoins: 10,
-      rewardXp: 5,
-    ),
-    Order(
-      id: 'lvl1_pebble_1',
-      requiredItemId: '🪨',
-      requiredCount: 2,
-      rewardCoins: 10,
-      rewardXp: 5,
-    ),
-    Order(
-      id: 'lvl1_tool_1',
-      requiredItemId: '🔧',
-      requiredCount: 1,
-      rewardCoins: 15,
-      rewardXp: 8,
-    ),
+    Order(id: 'lvl1_plant_1',   requiredItemId: '🌱', requiredCount: 2,  rewardCoins: 10,  rewardXp: 5),
+    Order(id: 'lvl1_plant_2',   requiredItemId: '🌱', requiredCount: 3,  rewardCoins: 15,  rewardXp: 7),
+    Order(id: 'lvl1_pebble_1',  requiredItemId: '🪨', requiredCount: 2,  rewardCoins: 10,  rewardXp: 5),
   ],
   2: [
-    // Orders available at Level 2 (includes Level 1 orders + new ones)
-    Order(
-      id: 'lvl2_plant_2',
-      requiredItemId: '🌿',
-      requiredCount: 1,
-      rewardCoins: 25,
-      rewardXp: 12,
-    ),
-    Order(
-      id: 'lvl2_pebble_2',
-      requiredItemId: '🪵',
-      requiredCount: 1,
-      rewardCoins: 25,
-      rewardXp: 12,
-    ),
-    Order(
-      id: 'lvl2_tool_2',
-      requiredItemId: '🔨',
-      requiredCount: 1,
-      rewardCoins: 35,
-      rewardXp: 18,
-    ),
-    Order(
-      id: 'lvl2_plant_1_many',
-      requiredItemId: '🌱',
-      requiredCount: 4,
-      rewardCoins: 20,
-      rewardXp: 10,
-    ), // More base items
+    Order(id: 'lvl2_plant_1',   requiredItemId: '🌿', requiredCount: 1,  rewardCoins: 25,  rewardXp: 12),
+    Order(id: 'lvl2_pebble_1',  requiredItemId: '🪵', requiredCount: 1,  rewardCoins: 25,  rewardXp: 12),
+    Order(id: 'lvl2_tool_1',    requiredItemId: '🔧', requiredCount: 2,  rewardCoins: 30,  rewardXp: 15),
+    Order(id: 'lvl2_plant_many',requiredItemId: '🌱', requiredCount: 4,  rewardCoins: 20,  rewardXp: 10),
   ],
   3: [
-    // Orders available at Level 3
-    Order(
-      id: 'lvl3_plant_3',
-      requiredItemId: '🌳',
-      requiredCount: 1,
-      rewardCoins: 50,
-      rewardXp: 25,
-    ),
-    Order(
-      id: 'lvl3_pebble_3',
-      requiredItemId: '🐚',
-      requiredCount: 1,
-      rewardCoins: 50,
-      rewardXp: 25,
-    ),
-    Order(
-      id: 'lvl3_tool_3',
-      requiredItemId: '🔩',
-      requiredCount: 1,
-      rewardCoins: 60,
-      rewardXp: 30,
-    ),
-    Order(
-      id: 'lvl3_plant_2_many',
-      requiredItemId: '🌿',
-      requiredCount: 2,
-      rewardCoins: 45,
-      rewardXp: 20,
-    ),
+    Order(id: 'lvl3_plant_1',   requiredItemId: '🌳', requiredCount: 1,  rewardCoins: 50,  rewardXp: 25),
+    Order(id: 'lvl3_pebble_1',  requiredItemId: '🐚', requiredCount: 1,  rewardCoins: 50,  rewardXp: 25),
+    Order(id: 'lvl3_tool_1',    requiredItemId: '🔩', requiredCount: 1,  rewardCoins: 60,  rewardXp: 30),
+    Order(id: 'lvl3_plant_2',   requiredItemId: '🌿', requiredCount: 2,  rewardCoins: 45,  rewardXp: 20),
   ],
   4: [
-    // Orders available at Level 4
-    Order(
-      id: 'lvl4_plant_4',
-      requiredItemId: '🌲',
-      requiredCount: 1,
-      rewardCoins: 100,
-      rewardXp: 50,
-    ),
-    Order(
-      id: 'lvl4_pebble_4',
-      requiredItemId: '🐌',
-      requiredCount: 1,
-      rewardCoins: 100,
-      rewardXp: 50,
-    ),
-    Order(
-      id: 'lvl4_tool_4',
-      requiredItemId: '⚙️',
-      requiredCount: 1,
-      rewardCoins: 120,
-      rewardXp: 60,
-    ),
-    Order(
-      id: 'lvl4_plant_3_many',
-      requiredItemId: '🌳',
-      requiredCount: 2,
-      rewardCoins: 90,
-      rewardXp: 45,
-    ),
+    Order(id: 'lvl4_plant_1',   requiredItemId: '🌲', requiredCount: 1,  rewardCoins: 100, rewardXp: 50),
+    Order(id: 'lvl4_pebble_1',  requiredItemId: '🐌', requiredCount: 1,  rewardCoins: 100, rewardXp: 50),
+    Order(id: 'lvl4_tool_1',    requiredItemId: '⚙️', requiredCount: 1,  rewardCoins: 120, rewardXp: 60),
+    Order(id: 'lvl4_gem_intro', requiredItemId: '💎', requiredCount: 2,  rewardCoins: 80,  rewardXp: 40),
+    Order(id: 'lvl4_plant_2',   requiredItemId: '🌿', requiredCount: 3,  rewardCoins: 65,  rewardXp: 32),
   ],
   5: [
-    // Orders available at Level 5
-    Order(
-      id: 'lvl5_gem_1',
-      requiredItemId: '💎',
-      requiredCount: 2,
-      rewardCoins: 150,
-      rewardXp: 75,
-    ),
-    Order(
-      id: 'lvl5_gem_2',
-      requiredItemId: '🔮',
-      requiredCount: 1,
-      rewardCoins: 220,
-      rewardXp: 110,
-    ),
-    Order(
-      id: 'lvl5_tool_5',
-      requiredItemId: '🔗',
-      requiredCount: 1,
-      rewardCoins: 200,
-      rewardXp: 100,
-    ),
-    Order(
-      id: 'lvl5_plant_4_many',
-      requiredItemId: '🌲',
-      requiredCount: 2,
-      rewardCoins: 180,
-      rewardXp: 90,
-    ),
-    Order(
-      id: 'lvl5_pebble_4_many',
-      requiredItemId: '🐌',
-      requiredCount: 2,
-      rewardCoins: 180,
-      rewardXp: 90,
-    ),
-    // Add more complex/higher reward orders for level 5+
+    Order(id: 'lvl5_gem_1',     requiredItemId: '🔮', requiredCount: 1,  rewardCoins: 220, rewardXp: 110),
+    Order(id: 'lvl5_tool_1',    requiredItemId: '🔗', requiredCount: 1,  rewardCoins: 200, rewardXp: 100),
+    Order(id: 'lvl5_plant_1',   requiredItemId: '🌲', requiredCount: 2,  rewardCoins: 180, rewardXp: 90),
+    Order(id: 'lvl5_pebble_1',  requiredItemId: '🐌', requiredCount: 2,  rewardCoins: 180, rewardXp: 90),
+    Order(id: 'lvl5_gem_2',     requiredItemId: '💎', requiredCount: 2,  rewardCoins: 150, rewardXp: 75),
   ],
-  // Add more levels as needed
+  6: [
+    Order(id: 'lvl6_food_intro',requiredItemId: '🌾', requiredCount: 3,  rewardCoins: 60,  rewardXp: 30),
+    Order(id: 'lvl6_plant_1',   requiredItemId: '🌴', requiredCount: 1,  rewardCoins: 250, rewardXp: 125),
+    Order(id: 'lvl6_pebble_1',  requiredItemId: '🦋', requiredCount: 1,  rewardCoins: 250, rewardXp: 125),
+    Order(id: 'lvl6_tool_1',    requiredItemId: '🔗', requiredCount: 1,  rewardCoins: 200, rewardXp: 100),
+    Order(id: 'lvl6_gem_1',     requiredItemId: '✨', requiredCount: 1,  rewardCoins: 300, rewardXp: 150),
+  ],
+  7: [
+    Order(id: 'lvl7_food_1',    requiredItemId: '🍞', requiredCount: 2,  rewardCoins: 120, rewardXp: 60),
+    Order(id: 'lvl7_food_many', requiredItemId: '🌾', requiredCount: 4,  rewardCoins: 80,  rewardXp: 40),
+    Order(id: 'lvl7_gem_1',     requiredItemId: '✨', requiredCount: 1,  rewardCoins: 300, rewardXp: 150),
+    Order(id: 'lvl7_pebble_1',  requiredItemId: '🌸', requiredCount: 1,  rewardCoins: 350, rewardXp: 175),
+    Order(id: 'lvl7_plant_1',   requiredItemId: '🌲', requiredCount: 2,  rewardCoins: 180, rewardXp: 90),
+  ],
+  8: [
+    Order(id: 'lvl8_magic_intro',requiredItemId: '⚗️', requiredCount: 2, rewardCoins: 80,  rewardXp: 40),
+    Order(id: 'lvl8_food_1',    requiredItemId: '🥐', requiredCount: 1,  rewardCoins: 180, rewardXp: 90),
+    Order(id: 'lvl8_gem_1',     requiredItemId: '🌟', requiredCount: 1,  rewardCoins: 400, rewardXp: 200),
+    Order(id: 'lvl8_plant_1',   requiredItemId: '🎋', requiredCount: 1,  rewardCoins: 450, rewardXp: 225),
+    Order(id: 'lvl8_pebble_1',  requiredItemId: '🌸', requiredCount: 1,  rewardCoins: 350, rewardXp: 175),
+  ],
+  9: [
+    Order(id: 'lvl9_magic_1',   requiredItemId: '🧪', requiredCount: 2,  rewardCoins: 200, rewardXp: 100),
+    Order(id: 'lvl9_magic_2',   requiredItemId: '🔯', requiredCount: 1,  rewardCoins: 300, rewardXp: 150),
+    Order(id: 'lvl9_food_1',    requiredItemId: '🥐', requiredCount: 2,  rewardCoins: 350, rewardXp: 175),
+    Order(id: 'lvl9_plant_1',   requiredItemId: '🌴', requiredCount: 2,  rewardCoins: 500, rewardXp: 250),
+    Order(id: 'lvl9_tool_1',    requiredItemId: '⚒️', requiredCount: 1,  rewardCoins: 550, rewardXp: 275),
+  ],
+  10: [
+    Order(id: 'lvl10_magic_1',  requiredItemId: '🌈', requiredCount: 1,  rewardCoins: 800, rewardXp: 400),
+    Order(id: 'lvl10_food_1',   requiredItemId: '🎁', requiredCount: 1,  rewardCoins: 700, rewardXp: 350),
+    Order(id: 'lvl10_gem_1',    requiredItemId: '👑', requiredCount: 1,  rewardCoins: 900, rewardXp: 450),
+    Order(id: 'lvl10_plant_1',  requiredItemId: '🎋', requiredCount: 1,  rewardCoins: 450, rewardXp: 225),
+    Order(id: 'lvl10_pebble_1', requiredItemId: '🌸', requiredCount: 1,  rewardCoins: 350, rewardXp: 175),
+    Order(id: 'lvl10_tool_1',   requiredItemId: '⚒️', requiredCount: 1,  rewardCoins: 550, rewardXp: 275),
+  ],
 };
 
 class OrderNotifier extends StateNotifier<List<Order>> {

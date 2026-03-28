@@ -8,6 +8,8 @@ final Map<String, List<String>> mergeTrees = {
   'tool':   ['🔧', '🔨', '🔩', '⚙️', '🔗', '⚒️'],
   'pebble': ['🪨', '🪵', '🐚', '🐌', '🦋', '🌸'],
   'gem':    ['💎', '🔮', '✨', '🌟', '👑'],
+  'food':   ['🌾', '🍞', '🥐', '🎂', '🍰', '🎁'],
+  'magic':  ['⚗️', '🧪', '🔯', '🪄', '🌀', '🌈'],
 };
 
 /// Build a MergeItem for each emoji in every sequence
