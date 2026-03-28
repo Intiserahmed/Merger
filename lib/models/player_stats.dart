@@ -34,5 +34,28 @@ class PlayerStats {
   }) : unlockedZoneIds =
            initialUnlockedZoneIds ?? []; // Initialize to empty list if null
 
-  // Note: Removed copyWith, ==, and hashCode
+  PlayerStats copyWith({
+    int? level,
+    int? xp,
+    int? coins,
+    int? gems,
+    int? energy,
+    int? maxEnergy,
+    List<String>? unlockedZoneIds,
+    int? completedOrders,
+    int? ordersForNextLevel,
+  }) {
+    return PlayerStats(
+      level: level ?? this.level,
+      xp: xp ?? this.xp,
+      coins: coins ?? this.coins,
+      gems: gems ?? this.gems,
+      energy: energy ?? this.energy,
+      maxEnergy: maxEnergy ?? this.maxEnergy,
+      initialUnlockedZoneIds:
+          unlockedZoneIds ?? List<String>.from(this.unlockedZoneIds),
+      completedOrders: completedOrders ?? this.completedOrders,
+      ordersForNextLevel: ordersForNextLevel ?? this.ordersForNextLevel,
+    );
+  }
 }

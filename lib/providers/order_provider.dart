@@ -158,6 +158,7 @@ final Map<int, List<Order>> _ordersByLevel = {
 
 class OrderNotifier extends StateNotifier<List<Order>> {
   final Ref ref;
+  final _random = Random();
 
   OrderNotifier(this.ref) : super([]) {
     // Generate initial orders based on starting level (1)
@@ -182,11 +183,10 @@ class OrderNotifier extends StateNotifier<List<Order>> {
   void _generateInitialOrders(int count) {
     final playerLevel = ref.read(playerStatsProvider).level;
     final availableOrders = _getAvailableOrdersForLevel(playerLevel);
-    final random = Random();
     final initialOrders = <Order>[];
 
     for (int i = 0; i < count && availableOrders.isNotEmpty; i++) {
-      final randomIndex = random.nextInt(availableOrders.length);
+      final randomIndex = _random.nextInt(availableOrders.length);
       initialOrders.add(availableOrders.removeAt(randomIndex));
     }
     state = initialOrders; // Set the initial state
@@ -294,8 +294,6 @@ class OrderNotifier extends StateNotifier<List<Order>> {
       print(
         "[OrderNotifier] _maybeAddNewOrder: Available for level $playerLevel (before filter): ${availableOrders.map((o) => o.id).toList()}",
       );
-      final random = Random();
-
       // Remove orders already active to avoid duplicates
       final activeOrderIds = state.map((o) => o.id).toSet();
       availableOrders.removeWhere((o) => activeOrderIds.contains(o.id));
@@ -304,7 +302,7 @@ class OrderNotifier extends StateNotifier<List<Order>> {
       );
 
       if (availableOrders.isNotEmpty) {
-        final randomIndex = random.nextInt(availableOrders.length);
+        final randomIndex = _random.nextInt(availableOrders.length);
         final newOrder = availableOrders[randomIndex];
         state = [...state, newOrder];
         print(
@@ -336,13 +334,12 @@ class OrderNotifier extends StateNotifier<List<Order>> {
         ref.read(playerStatsProvider).level; // Read the latest level
     print("[OrderNotifier] _fillOrderSlots: Filling for level $playerLevel");
     final availableOrders = _getAvailableOrdersForLevel(playerLevel);
-    final random = Random();
     final activeOrderIds = state.map((o) => o.id).toSet();
     availableOrders.removeWhere((o) => activeOrderIds.contains(o.id));
 
     final List<Order> newlyAddedOrders = [];
     for (int i = 0; i < ordersToAdd && availableOrders.isNotEmpty; i++) {
-      final randomIndex = random.nextInt(availableOrders.length);
+      final randomIndex = _random.nextInt(availableOrders.length);
       final newOrder = availableOrders.removeAt(
         randomIndex,
       ); // Remove to ensure uniqueness

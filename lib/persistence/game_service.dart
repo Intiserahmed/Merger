@@ -102,19 +102,18 @@ class GameService {
       final orders = container.read(orderProvider);
 
       await isar.writeTxn(() async {
-        // Clear existing data first
-        await isar.clear(); // Clears the entire database - simple approach
-        // Or clear collections individually:
-        // await isar.playerStats.clear();
-        // await isar.tileDatas.clear();
-        // await isar.orders.clear();
+        // Clear each collection individually so unrelated collections are not
+        // wiped if new collections are added in future.  This is safe because
+        // the entire block is one atomic Isar transaction — if it fails, Isar
+        // rolls back the whole thing, so we never end up with an empty DB.
+        await isar.playerStats.clear();
+        await isar.tileDatas.clear();
+        await isar.orders.clear();
 
-        // Save Player Stats (ensure only one entry if using autoIncrement id)
-        // We need to fetch the existing ID or handle the single entry case.
-        // For simplicity, let's assume we always overwrite the entry with id = Isar.autoIncrement (which is 1 for the first object)
-        playerStats.id =
-            1; // Assign a fixed ID for the single player stats object
-        await isar.playerStats.put(playerStats);
+        // Save Player Stats — copy the state object so we never mutate the
+        // live provider state (which is an Isar model with an `id` field).
+        final statsToSave = playerStats.copyWith()..id = 1;
+        await isar.playerStats.put(statsToSave);
         print(
           "Saved PlayerStats: Level ${playerStats.level}, Coins ${playerStats.coins}",
         );
