@@ -84,8 +84,8 @@ class GameGridHud extends ConsumerWidget {
                   border: Border.all(color: Colors.blueAccent, width: 2),
                 ),
                 child: Text(
-                  '$level',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  'Level $level',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
                 ),
               ),
             ],

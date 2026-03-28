@@ -11,10 +11,12 @@ class PlayerStats {
   int level;
   int xp;
   int coins;
-  int gems; // Add gems field
+  int gems;
   int energy;
-  int maxEnergy; // Maximum energy capacity
-  List<String> unlockedZoneIds; // Store IDs of unlocked zones
+  int maxEnergy;
+  int completedOrders;
+  int ordersForNextLevel;
+  List<String> unlockedZoneIds;
 
   // --- New field for infrastructure-based leveling ---
   // Stores data like ["1:0", "2:0"] (level:upgradeLevel)
@@ -25,14 +27,16 @@ class PlayerStats {
     this.level = 1,
     this.xp = 0,
     this.coins = 50,
-    this.gems = 20, // Starting gems value
+    this.gems = 20,
     this.energy = 100,
-    this.maxEnergy = 100, // Default max energy
-    List<String>? initialUnlockedZoneIds, // Make it optional
-    List<String>? initialInfrastructureLevelsData, // Optional for loading
+    this.maxEnergy = 100,
+    this.completedOrders = 0,
+    this.ordersForNextLevel = 3,
+    List<String>? initialUnlockedZoneIds,
+    List<String>? initialInfrastructureLevelsData,
   }) : unlockedZoneIds = initialUnlockedZoneIds ?? ['zone_starter'],
-       // Initialize with level 1 infrastructure at upgrade 0 if not provided
-       infrastructureLevelsData = initialInfrastructureLevelsData ?? ['1:0'];
+       infrastructureLevelsData =
+           initialInfrastructureLevelsData ?? ['1:0'];
 
   // Helper getter to parse the stored data into a usable map
   @ignore // Tell Isar to ignore this getter
@@ -51,5 +55,32 @@ class PlayerStats {
     return map;
   }
 
-  // Note: Removed copyWith, ==, and hashCode
+  PlayerStats copyWith({
+    int? level,
+    int? xp,
+    int? coins,
+    int? gems,
+    int? energy,
+    int? maxEnergy,
+    int? completedOrders,
+    int? ordersForNextLevel,
+    List<String>? unlockedZoneIds,
+    List<String>? infrastructureLevelsData,
+  }) {
+    return PlayerStats(
+      level: level ?? this.level,
+      xp: xp ?? this.xp,
+      coins: coins ?? this.coins,
+      gems: gems ?? this.gems,
+      energy: energy ?? this.energy,
+      maxEnergy: maxEnergy ?? this.maxEnergy,
+      completedOrders: completedOrders ?? this.completedOrders,
+      ordersForNextLevel: ordersForNextLevel ?? this.ordersForNextLevel,
+      initialUnlockedZoneIds:
+          unlockedZoneIds ?? List<String>.from(this.unlockedZoneIds),
+      initialInfrastructureLevelsData:
+          infrastructureLevelsData ??
+          List<String>.from(this.infrastructureLevelsData),
+    );
+  }
 }

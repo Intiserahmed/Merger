@@ -172,6 +172,7 @@ final Map<int, List<Order>> _ordersByLevel = {
 
 class OrderNotifier extends StateNotifier<List<Order>> {
   final Ref ref;
+  final _random = Random();
 
   OrderNotifier(this.ref) : super([]) {
     // Generate initial orders based on starting level (1)
@@ -196,11 +197,10 @@ class OrderNotifier extends StateNotifier<List<Order>> {
   void _generateInitialOrders(int count) {
     final playerLevel = ref.read(playerStatsProvider).level;
     final availableOrders = _getAvailableOrdersForLevel(playerLevel);
-    final random = Random();
     final initialOrders = <Order>[];
 
     for (int i = 0; i < count && availableOrders.isNotEmpty; i++) {
-      final randomIndex = random.nextInt(availableOrders.length);
+      final randomIndex = _random.nextInt(availableOrders.length);
       initialOrders.add(availableOrders.removeAt(randomIndex));
     }
     state = initialOrders; // Set the initial state
@@ -216,7 +216,7 @@ class OrderNotifier extends StateNotifier<List<Order>> {
   /// Attempts to deliver items for a specific order.
   /// Checks the grid for required items and consumes them if found.
   /// Grants rewards and replaces the order if successful.
-  void attemptDelivery(Order orderToDeliver) {
+  bool attemptDelivery(Order orderToDeliver) {
     final gridState = ref.read(gridProvider);
     final gridNotifier = ref.read(gridProvider.notifier);
     final playerNotifier = ref.read(playerStatsProvider.notifier);
@@ -272,19 +272,19 @@ class OrderNotifier extends StateNotifier<List<Order>> {
         "Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins.", // Removed XP from log
       );
 
-      // --- Player level up is now handled by infrastructure upgrades ---
-      // playerNotifier.orderCompleted(); // REMOVED
+      playerNotifier.orderCompleted();
 
       // 5. Remove the completed order
       state = state.where((order) => order.id != orderToDeliver.id).toList();
 
       // 6. Add a new order immediately to replace the completed one
-      _maybeAddNewOrder(); // Tries to add one order using the current level pool
+      _maybeAddNewOrder();
+      return true;
     } else {
       print(
         "Not enough items for order '${orderToDeliver.id}'. Found $foundCount, need ${orderToDeliver.requiredCount}.",
       );
-      // Optional: Show feedback to the user (e.g., SnackBar)
+      return false;
     }
   }
 
@@ -302,8 +302,6 @@ class OrderNotifier extends StateNotifier<List<Order>> {
       print(
         "[OrderNotifier] _maybeAddNewOrder: Available for level $playerLevel (before filter): ${availableOrders.map((o) => o.id).toList()}",
       );
-      final random = Random();
-
       // Remove orders already active to avoid duplicates
       final activeOrderIds = state.map((o) => o.id).toSet();
       availableOrders.removeWhere((o) => activeOrderIds.contains(o.id));
@@ -312,7 +310,7 @@ class OrderNotifier extends StateNotifier<List<Order>> {
       );
 
       if (availableOrders.isNotEmpty) {
-        final randomIndex = random.nextInt(availableOrders.length);
+        final randomIndex = _random.nextInt(availableOrders.length);
         final newOrder = availableOrders[randomIndex];
         state = [...state, newOrder];
         print(
@@ -341,20 +339,17 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     );
 
     final availableOrders = _getAvailableOrdersForLevel(playerLevel);
-    final random = Random();
-    final List<Order> newOrders = []; // Start with an empty list
+    final List<Order> newOrders = [];
 
-    // Ensure we don't try to pick more orders than are available for the level
-    int ordersToGenerate = min(maxActiveOrders, availableOrders.length);
-
+    final int ordersToGenerate = min(maxActiveOrders, availableOrders.length);
     for (int i = 0; i < ordersToGenerate; i++) {
-      // Check if availableOrders is empty before accessing it
       if (availableOrders.isEmpty) break;
-
-      final randomIndex = random.nextInt(availableOrders.length);
-      // Add the selected order to newOrders and remove it from availableOrders
-      // to prevent duplicates in this batch.
-      newOrders.add(availableOrders.removeAt(randomIndex));
+      final randomIndex = _random.nextInt(availableOrders.length);
+      final newOrder = availableOrders.removeAt(randomIndex);
+      newOrders.add(newOrder);
+      print(
+        "[OrderNotifier] _fillOrderSlots: Adding new order ${newOrder.id} for level $playerLevel",
+      );
     }
 
     if (newOrders.isNotEmpty) {

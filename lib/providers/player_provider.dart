@@ -1,410 +1,240 @@
 // lib/providers/player_provider.dart
-import 'dart:async'; // Import async for Timer
+import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/player_stats.dart'; // Import the model
-import '../models/tile_unlock.dart'; // Import TileUnlock for the new method
-import 'expansion_provider.dart'; // Import expansion provider
+import '../models/player_stats.dart';
+import '../models/tile_unlock.dart';
+import 'expansion_provider.dart';
 
-// Individual providers for simple stats (easy to watch individually) - Keeping for now
-// Consider removing these if PlayerStatsNotifier is the primary way to manage stats
-final energyProvider = StateProvider<int>((ref) => 100); // Initial energy
-final coinsProvider = StateProvider<int>((ref) => 50); // Initial coins
-final gemsProvider = StateProvider<int>((ref) => 20); // Initial gems
-final xpProvider = StateProvider<int>((ref) => 0); // Initial XP
-final playerLevelProvider = StateProvider<int>((ref) => 1); // Initial Level
+final energyProvider = StateProvider<int>((ref) => 100);
+final coinsProvider = StateProvider<int>((ref) => 50);
+final gemsProvider = StateProvider<int>((ref) => 20);
+final xpProvider = StateProvider<int>((ref) => 0);
+final playerLevelProvider = StateProvider<int>((ref) => 1);
 
-// --- OR ---
-
-// Define energy cost for spawning an item - Removing as spawn button will be removed
-// const int spawnEnergyCost = 10;
-
-// --- Define infrastructure upgrade costs and max level ---
+// --- Infrastructure upgrade system ---
 const int maxInfrastructureUpgrade = 5;
 const Map<int, int> infrastructureUpgradeCost = {
-  // Upgrade Level : Cost
-  1: 10, // New cost
-  2: 15, // New cost
-  3: 20, // New cost
-  4: 25, // New cost
-  5: 30, // New cost
+  1: 10,
+  2: 15,
+  3: 20,
+  4: 25,
+  5: 30,
 };
-// Define max player level based on infrastructure definitions
-const int maxPlayerLevel = 5; // Example: Up to level 5 infrastructure
+const int maxPlayerLevel = 5;
 
-// A single Notifier for the whole PlayerStats object (better if stats often change together)
+// --- Order-based level thresholds (cumulative) ---
+const Map<int, int> _totalOrdersPerLevel = {
+  2: 3,
+  3: 8,
+  4: 15,
+  5: 25,
+  6: 40,
+};
+
 class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
   final Ref ref;
   Timer? _energyRegenTimer;
+  late final AppLifecycleListener _lifecycleListener;
 
-  // Initialize with a non-const PlayerStats instance and start the timer
-  PlayerStatsNotifier(this.ref)
-    : super(
-        // PlayerStats initializes with default infrastructure level ["1:0"]
-        PlayerStats(),
-      ) {
+  PlayerStatsNotifier(this.ref) : super(PlayerStats()) {
     _startEnergyRegeneration();
+    _lifecycleListener = AppLifecycleListener(
+      onResume: _startEnergyRegeneration,
+      onHide: _stopEnergyRegeneration,
+    );
   }
 
-  // --- Energy Regeneration ---
+  // ── Energy regeneration ────────────────────────────────────────────────────
+
   void _startEnergyRegeneration() {
-    // Cancel any existing timer
     _energyRegenTimer?.cancel();
-    // Start a new timer to regenerate 1 energy every 60 seconds
-    _energyRegenTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
+    _energyRegenTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (state.energy < state.maxEnergy) {
-        // Create a new state object with updated energy
-        // Isar manages the ID, so we don't pass it here.
-        // Create a new state object, copying all fields and updating energy
-        state = PlayerStats(
-          level: state.level,
-          xp: state.xp,
-          coins: state.coins,
-          gems: state.gems,
-          energy: state.energy + 1, // Update energy
-          maxEnergy: state.maxEnergy,
-          initialUnlockedZoneIds: state.unlockedZoneIds,
-          // Ensure infrastructure data is copied
-          initialInfrastructureLevelsData: state.infrastructureLevelsData,
-        );
-      } else {
-        // Optional: Could cancel the timer if energy is full and restart when spent,
-        // but periodic check is simpler and often sufficient.
+        state = state.copyWith(energy: state.energy + 1);
       }
     });
   }
 
-  // Override dispose to cancel the timer when the notifier is no longer used
+  void _stopEnergyRegeneration() {
+    _energyRegenTimer?.cancel();
+    _energyRegenTimer = null;
+  }
+
   @override
   void dispose() {
     _energyRegenTimer?.cancel();
+    _lifecycleListener.dispose();
     super.dispose();
   }
 
-  // --- Existing Methods (Modified to use the new state structure) ---
+  // ── Stat mutations ─────────────────────────────────────────────────────────
+
   void addXp(int amount) {
-    // Create a new state object
-    state = PlayerStats(
-      level: state.level,
-      xp: state.xp + amount, // Update XP - Keep XP tracking separate for now
-      coins: state.coins,
-      gems: state.gems,
-      energy: state.energy,
-      maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds,
-      initialInfrastructureLevelsData: state.infrastructureLevelsData,
-    );
-    // _checkLevelUp(); // Remove XP-based level up check
+    state = state.copyWith(xp: state.xp + amount);
   }
 
-  /// Attempts to spend energy. Returns true if successful, false otherwise.
   bool spendEnergy(int amount) {
-    if (state.energy >= amount) {
-      // Create a new state object
-      state = PlayerStats(
-        level: state.level,
-        xp: state.xp,
-        coins: state.coins,
-        gems: state.gems,
-        energy: state.energy - amount, // Update energy
-        maxEnergy: state.maxEnergy,
-        initialUnlockedZoneIds: state.unlockedZoneIds,
-        initialInfrastructureLevelsData: state.infrastructureLevelsData,
-      );
-      // Consider restarting the timer here if it was stopped when full
-      // _startEnergyRegeneration(); // If implementing stop-when-full logic
-      return true; // Energy spent successfully
-    } else {
-      // Handle insufficient energy (e.g., show message)
-      print("Not enough energy!");
-      return false; // Failed to spend energy
+    if (state.energy < amount) {
+      print('Not enough energy!');
+      return false;
     }
+    state = state.copyWith(energy: state.energy - amount);
+    return true;
   }
 
-  /// Adds energy, ensuring it doesn't exceed maxEnergy.
   void addEnergy(int amount) {
-    // Create a new state object
-    final newEnergy = (state.energy + amount).clamp(
-      0,
-      state.maxEnergy,
-    ); // Clamp between 0 and max
-    state = PlayerStats(
-      level: state.level,
-      xp: state.xp,
-      coins: state.coins,
-      gems: state.gems,
-      energy: newEnergy, // Update energy
-      maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds,
-      initialInfrastructureLevelsData: state.infrastructureLevelsData,
+    state = state.copyWith(
+      energy: (state.energy + amount).clamp(0, state.maxEnergy),
     );
-    // Consider restarting the timer here if it was stopped when full
-    // if (newEnergy < state.maxEnergy) _startEnergyRegeneration();
   }
 
   void addCoins(int amount) {
-    // Create a new state object
-    state = PlayerStats(
-      level: state.level,
-      xp: state.xp,
-      coins: state.coins + amount, // Update coins
-      gems: state.gems,
-      energy: state.energy,
-      maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds,
-      initialInfrastructureLevelsData: state.infrastructureLevelsData,
-    );
+    state = state.copyWith(coins: state.coins + amount);
   }
 
-  // --- NEW: Method for upgrading infrastructure ---
+  void spendCoins(int amount) {
+    if (state.coins < amount) {
+      print('Not enough coins!');
+      return;
+    }
+    state = state.copyWith(coins: state.coins - amount);
+  }
+
+  void addGems(int amount) {
+    state = state.copyWith(gems: state.gems + amount);
+  }
+
+  bool spendGems(int amount) {
+    if (state.gems < amount) {
+      print('Not enough gems!');
+      return false;
+    }
+    state = state.copyWith(gems: state.gems - amount);
+    return true;
+  }
+
+  // ── Infrastructure upgrade system ──────────────────────────────────────────
+
   bool upgradeInfrastructure(int levelToUpgrade) {
     final currentInfrastructures = state.infrastructureLevels;
     final currentUpgradeLevel = currentInfrastructures[levelToUpgrade] ?? 0;
 
     if (currentUpgradeLevel >= maxInfrastructureUpgrade) {
-      print("Infrastructure for level $levelToUpgrade already maxed out.");
+      print('Infrastructure for level $levelToUpgrade already maxed out.');
       return false;
     }
 
     final cost = infrastructureUpgradeCost[currentUpgradeLevel + 1];
     if (cost == null) {
-      print(
-        "Error: No cost defined for upgrading level $levelToUpgrade infrastructure to level ${currentUpgradeLevel + 1}",
-      );
+      print('Error: No cost defined for upgrade.');
       return false;
     }
 
     if (state.coins < cost) {
-      print(
-        "Not enough coins to upgrade level $levelToUpgrade infrastructure. Need $cost, have ${state.coins}",
-      );
+      print('Not enough coins to upgrade. Need $cost, have ${state.coins}');
       return false;
     }
 
-    // Spend coins
-    spendCoins(cost); // This already updates the state
+    spendCoins(cost);
 
-    // Update the infrastructure level
     final newUpgradeLevel = currentUpgradeLevel + 1;
-    final newInfrastructureData = List<String>.from(
-      state.infrastructureLevelsData,
-    );
+    final newInfrastructureData = List<String>.from(state.infrastructureLevelsData);
     final index = newInfrastructureData.indexWhere(
       (s) => s.startsWith('$levelToUpgrade:'),
     );
     if (index != -1) {
       newInfrastructureData[index] = '$levelToUpgrade:$newUpgradeLevel';
     } else {
-      // Should not happen if initialized correctly, but handle defensively
       newInfrastructureData.add('$levelToUpgrade:$newUpgradeLevel');
     }
 
-    // Update the state with the new infrastructure data
-    // We need to read the state *after* spendCoins potentially updated it
-    final currentState = state; // Capture state after spendCoins
-    state = PlayerStats(
-      level: currentState.level,
-      xp: currentState.xp,
-      coins: currentState.coins, // Coins already updated by spendCoins
-      gems: currentState.gems,
-      energy: currentState.energy,
-      maxEnergy: currentState.maxEnergy,
-      initialUnlockedZoneIds: currentState.unlockedZoneIds,
-      initialInfrastructureLevelsData:
-          newInfrastructureData, // The updated list
-    );
+    state = state.copyWith(infrastructureLevelsData: newInfrastructureData);
 
-    print(
-      "Upgraded infrastructure for level $levelToUpgrade to level $newUpgradeLevel for $cost coins.",
-    );
-
-    // Check for player level up after infrastructure upgrade
+    print('Upgraded infrastructure for level $levelToUpgrade to $newUpgradeLevel for $cost coins.');
     _checkPlayerLevelUp();
-
     return true;
   }
 
-  // --- NEW: Check for player level up based on infrastructure ---
   void _checkPlayerLevelUp() {
     final currentLevel = state.level;
-    if (currentLevel >= maxPlayerLevel) return; // Already max level
-
-    final currentInfrastructures = state.infrastructureLevels;
-    final currentLevelInfraUpgrade = currentInfrastructures[currentLevel] ?? 0;
-
+    if (currentLevel >= maxPlayerLevel) return;
+    final currentLevelInfraUpgrade = state.infrastructureLevels[currentLevel] ?? 0;
     if (currentLevelInfraUpgrade >= maxInfrastructureUpgrade) {
-      // Current level's infrastructure is maxed, trigger player level up
       levelUp();
     }
   }
 
-  void spendCoins(int amount) {
-    if (state.coins >= amount) {
-      // Create a new state object
-      state = PlayerStats(
-        level: state.level,
-        xp: state.xp,
-        coins: state.coins - amount, // Update coins
-        gems: state.gems,
-        energy: state.energy,
-        maxEnergy: state.maxEnergy,
-        initialUnlockedZoneIds: state.unlockedZoneIds,
-        initialInfrastructureLevelsData: state.infrastructureLevelsData,
-      );
-    } else {
-      print("Not enough coins!");
-      // throw Exception("Not enough coins"); // Or throw
+  // ── Order-based levelling ──────────────────────────────────────────────────
+
+  void orderCompleted() {
+    state = state.copyWith(completedOrders: state.completedOrders + 1);
+    _checkOrderLevelUp();
+  }
+
+  void _checkOrderLevelUp() {
+    if (state.completedOrders >= state.ordersForNextLevel &&
+        _totalOrdersPerLevel.containsKey(state.level + 1)) {
+      levelUp();
+    } else if (state.completedOrders >= state.ordersForNextLevel) {
+      print('Max level reached.');
     }
   }
 
-  // Modified levelUp for infrastructure-based progression
+  // ── Level up ───────────────────────────────────────────────────────────────
+
   void levelUp() {
     final currentLevel = state.level;
     if (currentLevel >= maxPlayerLevel) {
-      print("Already at max player level ($maxPlayerLevel).");
+      print('Already at max player level ($maxPlayerLevel).');
       return;
     }
 
     final nextLevel = currentLevel + 1;
-    final currentInfrastructureData = List<String>.from(
-      state.infrastructureLevelsData,
-    );
-
-    // Add the next level's infrastructure entry if it doesn't exist
-    if (!currentInfrastructureData.any((s) => s.startsWith('$nextLevel:'))) {
-      currentInfrastructureData.add('$nextLevel:0');
+    final newMaxEnergy = state.maxEnergy + 10;
+    final newInfrastructureData = List<String>.from(state.infrastructureLevelsData);
+    if (!newInfrastructureData.any((s) => s.startsWith('$nextLevel:'))) {
+      newInfrastructureData.add('$nextLevel:0');
     }
+    final nextTarget = _totalOrdersPerLevel[nextLevel + 1] ?? 999999;
 
-    state = PlayerStats(
-      level: nextLevel, // Update level
-      xp: state.xp, // Keep XP as is
-      coins: state.coins,
-      gems: state.gems,
-      // Increase max energy and refill current energy to the new max
-      maxEnergy: state.maxEnergy + 10, // Increase max energy by 10
-      energy: state.maxEnergy + 10, // Refill energy to the new max
-      initialUnlockedZoneIds: state.unlockedZoneIds,
-      initialInfrastructureLevelsData:
-          currentInfrastructureData, // Include new level entry
+    state = state.copyWith(
+      level: nextLevel,
+      maxEnergy: newMaxEnergy,
+      energy: newMaxEnergy,
+      infrastructureLevelsData: newInfrastructureData,
+      ordersForNextLevel: nextTarget,
     );
-    print(
-      "*** PLAYER LEVEL UP! Reached level ${state.level}. Max energy increased to ${state.maxEnergy}. ***",
-    );
-    // Consider restarting the timer here if it was stopped when full
-    // _startEnergyRegeneration(); // If implementing stop-when-full logic
+    print('Level Up! Reached level ${state.level}. Max energy: ${state.maxEnergy}.');
   }
 
-  // Load/Save methods for Milestone 3
-  void loadStats(PlayerStats loadedStats) {
-    // Ensure the loaded stats object is assigned correctly
-    // We create a new instance based on the loaded data, Isar handles the ID.
-    state = PlayerStats(
-      level: loadedStats.level,
-      xp: loadedStats.xp,
-      coins: loadedStats.coins,
-      gems: loadedStats.gems,
-      energy: loadedStats.energy,
-      maxEnergy: loadedStats.maxEnergy,
-      initialUnlockedZoneIds: loadedStats.unlockedZoneIds,
-      // Load infrastructure progress
-      initialInfrastructureLevelsData: loadedStats.infrastructureLevelsData,
-    );
-    // Ensure timer restarts
-    _startEnergyRegeneration();
-  }
+  // ── Zone unlocking ─────────────────────────────────────────────────────────
 
-  // --- Zone Unlocking ---
-  /// Attempts to unlock a zone. Returns true if successful.
-  bool unlockZone(TileUnlock zoneToUnlock) {
-    // 1. Check Requirements
-    if (state.level < zoneToUnlock.requiredLevel) {
-      print(
-        "Cannot unlock zone '${zoneToUnlock.id}'. Requires level ${zoneToUnlock.requiredLevel}, player is level ${state.level}.",
-      );
-      // Optional: Show feedback to user
+  bool unlockZone(TileUnlock zone) {
+    if (state.level < zone.requiredLevel) {
+      print("Cannot unlock '${zone.id}'. Requires level ${zone.requiredLevel}.");
       return false;
     }
-    if (state.coins < zoneToUnlock.unlockCostCoins) {
-      print(
-        "Cannot unlock zone '${zoneToUnlock.id}'. Requires ${zoneToUnlock.unlockCostCoins} coins, player has ${state.coins}.",
-      );
-      // Optional: Show feedback to user
+    if (state.coins < zone.unlockCostCoins) {
+      print("Cannot unlock '${zone.id}'. Need ${zone.unlockCostCoins} coins.");
       return false;
     }
-
-    // 2. Spend Coins (using existing method which handles the state update)
-    spendCoins(
-      zoneToUnlock.unlockCostCoins,
-    ); // Assumes spendCoins doesn't throw
-
-    // 3. Update Unlocked Status (directly modify state)
-    // Create a new list with the added zone ID
-    final newUnlockedIds = List<String>.from(state.unlockedZoneIds)
-      ..add(zoneToUnlock.id);
-    // Update the state with the new list
-    state = PlayerStats(
-      level: state.level,
-      xp: state.xp,
-      coins: state.coins, // Coins already spent by spendCoins call
-      gems: state.gems,
-      energy: state.energy,
-      maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: newUnlockedIds, // Assign the updated list
-      initialInfrastructureLevelsData: state.infrastructureLevelsData,
-    );
-
-    // 4. Optional: Update Grid Tiles
-    // This might be better handled by watching unlockedStatusProvider in GridProvider
-    // or by passing the gridNotifier reference here.
-    // Example (if gridNotifier was passed or read):
-    // final gridNotifier = ref.read(gridProvider.notifier);
-    // gridNotifier.unlockTilesForZone(zoneToUnlock); // Needs implementation in GridNotifier
-
-    print(
-      "Zone '${zoneToUnlock.id}' unlocked successfully for ${zoneToUnlock.unlockCostCoins} coins!",
-    );
+    spendCoins(zone.unlockCostCoins);
+    final newIds = List<String>.from(state.unlockedZoneIds)..add(zone.id);
+    state = state.copyWith(unlockedZoneIds: newIds);
+    print("Zone '${zone.id}' unlocked for ${zone.unlockCostCoins} coins!");
     return true;
   }
 
-  // --- Gem Management ---
-  void addGems(int amount) {
-    state = PlayerStats(
-      level: state.level,
-      xp: state.xp,
-      coins: state.coins,
-      gems: state.gems + amount, // Update gems
-      energy: state.energy,
-      maxEnergy: state.maxEnergy,
-      initialUnlockedZoneIds: state.unlockedZoneIds,
-      initialInfrastructureLevelsData: state.infrastructureLevelsData,
-    );
-  }
+  // ── Persistence ────────────────────────────────────────────────────────────
 
-  bool spendGems(int amount) {
-    if (state.gems >= amount) {
-      state = PlayerStats(
-        level: state.level,
-        xp: state.xp,
-        coins: state.coins,
-        gems: state.gems - amount, // Update gems
-        energy: state.energy,
-        maxEnergy: state.maxEnergy,
-        initialUnlockedZoneIds: state.unlockedZoneIds,
-        initialInfrastructureLevelsData: state.infrastructureLevelsData,
-      );
-      return true;
-    } else {
-      print("Not enough gems!");
-      return false;
-    }
+  void loadStats(PlayerStats loaded) {
+    state = loaded.copyWith();
+    _startEnergyRegeneration();
   }
 }
 
 final playerStatsProvider =
-    StateNotifierProvider<PlayerStatsNotifier, PlayerStats>((ref) {
-      // Pass the ref to the constructor
-      return PlayerStatsNotifier(ref);
-    });
-
-// The Notifier is generally better for related state and logic encapsulation.
-
-// --- Removed XP Threshold Helpers ---
+    StateNotifierProvider<PlayerStatsNotifier, PlayerStats>(
+  (ref) => PlayerStatsNotifier(ref),
+);
