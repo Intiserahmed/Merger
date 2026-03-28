@@ -364,6 +364,16 @@ class OrderNotifier extends StateNotifier<List<Order>> {
       );
     }
   }
+
+  // ── Debug helpers (never call from prod code) ──────────────────────────────
+
+  void refreshOrders() => _fillOrderSlots();
+
+  void debugCompleteOrder(String orderId) {
+    state = state.where((o) => o.id != orderId).toList();
+    ref.read(playerStatsProvider.notifier).addCoins(100);
+    _maybeAddNewOrder();
+  }
 }
 
 // Update the provider definition to pass the ref

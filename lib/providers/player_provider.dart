@@ -208,6 +208,21 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
     print('Level Up! Reached level ${state.level}. Max energy: ${state.maxEnergy}.');
   }
 
+  // ── Debug helpers (never call from prod code) ──────────────────────────────
+
+  void debugLevelUp() => levelUp();
+
+  void debugReset() {
+    state = PlayerStats(
+      level: 1,
+      xp: 0,
+      energy: 20,
+      maxEnergy: 20,
+      coins: 0,
+      gems: 0,
+    );
+  }
+
   // ── Zone unlocking ─────────────────────────────────────────────────────────
 
   bool unlockZone(TileUnlock zone) {

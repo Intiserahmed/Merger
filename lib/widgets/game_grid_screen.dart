@@ -20,9 +20,13 @@ import '../models/tile_data.dart';
 import '../providers/grid_provider.dart' as grid;
 import '../providers/player_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../models/merge_trees.dart'; // Keep for _buildTile merge logic
-// GeneratorConfig needed only by Bottom Bar now
-// import '../models/generator_config.dart';
+import '../models/merge_trees.dart';
+import 'package:flutter/foundation.dart';
+import '../debug/debug_panel.dart';
+import 'game_grid/drag_layer.dart';
+import 'game_grid/merge_effects.dart';
+import 'game_grid/generator_tile.dart';
+import '../services/merge_audio.dart';
 
 // Define colors (keep here or move to a theme file)
 final Color lightBrown = Colors.brown[300]!;
@@ -38,8 +42,230 @@ class GameGridScreen extends ConsumerStatefulWidget {
 }
 
 // Create the State class
-class _GameGridScreenState extends ConsumerState<GameGridScreen> {
+class _GameGridScreenState extends ConsumerState<GameGridScreen>
+    with SingleTickerProviderStateMixin {
   TileData? _selectedTile;
+
+  // ── Custom drag system ─────────────────────────────────────────────────
+  final GlobalKey _gridKey = GlobalKey();
+  final DragOverlayController _dragCtrl = DragOverlayController();
+
+  // ── Merge effects ──────────────────────────────────────────────────────
+  final MergeEffectsController _mergeCtrl = MergeEffectsController();
+  final Set<(int, int)> _implosionTiles = {};
+  (int, int)? _popCell;
+
+  // ── Screen shake ───────────────────────────────────────────────────────
+  late final AnimationController _shakeCtrl;
+  Offset _shakeOffset = Offset.zero;
+
+  int? _dragRow, _dragCol;
+  (int, int)? _hoverCell;
+  bool _isDragging = false;
+
+  // ── Drag helpers ───────────────────────────────────────────────────────
+
+  void _startItemDrag(int row, int col, Offset globalPos) {
+    final gridData = ref.read(grid.gridProvider);
+    if (row >= gridData.length || col >= gridData[0].length) return;
+    final tile = gridData[row][col];
+    if (!tile.isItem || tile.itemImagePath == null) return;
+
+    setState(() {
+      _dragRow = row;
+      _dragCol = col;
+      _hoverCell = null;
+      _isDragging = true;
+    });
+
+    _dragCtrl.startDrag(
+      emoji: tile.itemImagePath!,
+      globalPos: globalPos,
+      tileSize: 54.0,
+    );
+  }
+
+  void _updateItemDrag(Offset globalPos) {
+    if (!_isDragging) return;
+    _dragCtrl.updateDrag(globalPos);
+
+    final cell = _cellFromGlobal(globalPos);
+    final wasValid = _hoverCell != null && _isValidDrop(_hoverCell!.$1, _hoverCell!.$2);
+    final nowValid = cell != null && _isValidDrop(cell.$1, cell.$2);
+
+    if (cell != _hoverCell) {
+      setState(() => _hoverCell = cell);
+    }
+    if (nowValid != wasValid) {
+      _dragCtrl.setOverValid(nowValid);
+    }
+  }
+
+  void _endItemDrag(Offset globalPos) {
+    if (!_isDragging) return;
+
+    final srcRow = _dragRow!;
+    final srcCol = _dragCol!;
+    final cell = _cellFromGlobal(globalPos);
+
+    // Validate BEFORE clearing drag state (_isValidDrop reads _dragRow/_dragCol)
+    final isValid = cell != null &&
+        !(cell.$1 == srcRow && cell.$2 == srcCol) &&
+        _isValidDrop(cell.$1, cell.$2);
+
+    setState(() {
+      _isDragging = false;
+      _hoverCell = null;
+      _dragRow = null;
+      _dragCol = null;
+    });
+
+    if (isValid) {
+      final tgtRow = cell!.$1, tgtCol = cell.$2;
+      final isMerge = _willMerge(srcRow, srcCol, tgtRow, tgtCol);
+      final target = _cellCenterGlobal(tgtRow, tgtCol);
+
+      _dragCtrl.snapTo(target, () {
+        if (isMerge) {
+          // Hide source + target tiles during implosion
+          final gridData = ref.read(grid.gridProvider);
+          final srcEmoji = gridData[srcRow][srcCol].itemImagePath ?? '';
+          final isRare   = (gridData[srcRow][srcCol].overlayNumber) >= 3;
+
+          setState(() {
+            _implosionTiles.add((srcRow, srcCol));
+            _implosionTiles.add((tgtRow, tgtCol));
+          });
+
+          MergeAudio.instance.playMerge();
+
+          _mergeCtrl.onPop = () {
+            setState(() => _popCell = (tgtRow, tgtCol));
+            Future.delayed(const Duration(milliseconds: 400), () {
+              if (mounted) setState(() => _popCell = null);
+            });
+          };
+          _mergeCtrl.trigger(
+            mergeGlobal:  _cellCenterGlobal(tgtRow, tgtCol),
+            src1Global:   _cellCenterGlobal(srcRow, srcCol),
+            src2Global:   _cellCenterGlobal(tgtRow, tgtCol),
+            sourceEmoji:  srcEmoji,
+            xpGain:       5 + (gridData[srcRow][srcCol].overlayNumber) * 3,
+            isRare:       isRare,
+            onImplosionDone: () {
+              _executeDrop(srcRow, srcCol, tgtRow, tgtCol);
+              setState(() {
+                _implosionTiles.remove((srcRow, srcCol));
+                _implosionTiles.remove((tgtRow, tgtCol));
+              });
+            },
+          );
+        } else {
+          _executeDrop(srcRow, srcCol, tgtRow, tgtCol);
+        }
+      });
+    } else {
+      // Invalid → wobble and return arc
+      final src = _cellCenterGlobal(srcRow, srcCol);
+      _dragCtrl.wobbleAndReturn(src, () {});
+    }
+  }
+
+  (int, int)? _cellFromGlobal(Offset globalPos) {
+    final box = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+    final local = box.globalToLocal(globalPos);
+    final cw = box.size.width / grid.colCount;
+    final ch = box.size.height / grid.rowCount;
+    final col = (local.dx / cw).floor();
+    final row = (local.dy / ch).floor();
+    if (row < 0 || row >= grid.rowCount || col < 0 || col >= grid.colCount) {
+      return null;
+    }
+    return (row, col);
+  }
+
+  Offset _cellCenterGlobal(int row, int col) {
+    final box = _gridKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return Offset.zero;
+    final cw = box.size.width / grid.colCount;
+    final ch = box.size.height / grid.rowCount;
+    return box.localToGlobal(Offset((col + 0.5) * cw, (row + 0.5) * ch));
+  }
+
+  bool _willMerge(int srcRow, int srcCol, int tgtRow, int tgtCol) {
+    final gridData = ref.read(grid.gridProvider);
+    if (tgtRow >= gridData.length || tgtCol >= gridData[0].length) return false;
+    final target = gridData[tgtRow][tgtCol];
+    final source = gridData[srcRow][srcCol];
+    return target.itemImagePath != null &&
+        source.itemImagePath != null &&
+        target.itemImagePath == source.itemImagePath;
+  }
+
+  bool _isValidDrop(int row, int col) {
+    final gridData = ref.read(grid.gridProvider);
+    final srcRow = _dragRow;
+    final srcCol = _dragCol;
+    if (srcRow == null || srcCol == null) return false;
+    if (row == srcRow && col == srcCol) return false;
+    if (row >= gridData.length || col >= gridData[0].length) return false;
+
+    final target = gridData[row][col];
+    final source = gridData[srcRow][srcCol];
+
+    if (target.isLocked) return false;
+    if (target.itemImagePath == null && source.isItem) return true;
+    if (target.itemImagePath != null &&
+        source.itemImagePath != null &&
+        target.itemImagePath == source.itemImagePath) {
+      final next = getNextItemInSequence(target.itemImagePath!);
+      if (next != null ||
+          target.itemImagePath == '🐚' ||
+          target.itemImagePath == '⚔️') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _executeDrop(int srcRow, int srcCol, int tgtRow, int tgtCol) {
+    final gridData = ref.read(grid.gridProvider);
+    if (tgtRow >= gridData.length || tgtCol >= gridData[0].length) return;
+    final target = gridData[tgtRow][tgtCol];
+    final source = gridData[srcRow][srcCol];
+
+    if (target.itemImagePath == null && source.isItem) {
+      ref.read(grid.gridProvider.notifier).moveItem(srcRow, srcCol, tgtRow, tgtCol);
+    } else if (target.itemImagePath != null &&
+        target.itemImagePath == source.itemImagePath) {
+      ref.read(grid.gridProvider.notifier).mergeTiles(tgtRow, tgtCol, srcRow, srcCol);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    )
+      ..addListener(() {
+        final t = _shakeCtrl.value;
+        setState(() => _shakeOffset = Offset(math.sin(t * math.pi * 8) * 2.0, 0));
+      })
+      ..addStatusListener((s) {
+        if (s == AnimationStatus.completed) setState(() => _shakeOffset = Offset.zero);
+      });
+
+    _mergeCtrl.onShake = () => _shakeCtrl.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _shakeCtrl.dispose();
+    super.dispose();
+  }
 
   void _showLevelUpBanner(BuildContext context, int newLevel) {
     showDialog(
@@ -81,21 +307,23 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
     );
   }
 
-  // --- Build Tile Method (Remains in State due to complexity and state access) ---
+  // --- Build Tile Method ---
   Widget _buildTile(int index) {
     final int row = index ~/ grid.colCount;
     final int col = index % grid.colCount;
     final gridData = ref.watch(grid.gridProvider);
 
-    // Bounds check (important!)
     if (row >= gridData.length || col >= gridData[0].length) {
-      // Handle potential out-of-bounds during grid resize/init
-      return Container(
-        color: Colors.red.withOpacity(0.2),
-        margin: const EdgeInsets.all(1.0),
-      ); // Placeholder for error/loading
+      return Container(color: Colors.red.withOpacity(0.2), margin: const EdgeInsets.all(1.0));
     }
+
     final TileData tileData = gridData[row][col];
+    final bool isDragSource    = _isDragging && _dragRow == row && _dragCol == col;
+    final bool isImploding     = _implosionTiles.contains((row, col));
+    final bool isPopTarget     = _popCell == (row, col);
+    final bool isHoverTarget = _hoverCell == (row, col);
+    final bool hoverValid = isHoverTarget && _isValidDrop(row, col);
+    final bool hoverInvalid = isHoverTarget && !hoverValid && _isDragging;
 
     Color backgroundColor;
     if (tileData.baseImagePath == '🟩') {
@@ -106,177 +334,95 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
       backgroundColor = (row + col) % 2 == 0 ? lightBrown : darkBrown;
     }
 
-    return DragTarget<TileDropData>(
-      onWillAccept: (dragData) {
-        if (dragData == null || (dragData.row == row && dragData.col == col)) {
-          return false;
-        }
-        final targetTile = tileData;
-        final sourceTile = dragData.tileData;
+    // Hover highlight colours
+    Color borderColor = Colors.black.withOpacity(0.2);
+    double borderWidth = 0.5;
+    if (hoverValid) {
+      borderColor = Colors.greenAccent.shade400;
+      borderWidth = 2.5;
+    } else if (hoverInvalid) {
+      borderColor = Colors.redAccent.shade200;
+      borderWidth = 2.0;
+    }
 
-        if (targetTile.isLocked) return false;
+    // ── Generator tiles get their own rich widget ───────────────────────────
+    if (tileData.isGenerator) {
+      return GeneratorTile(
+        key: ValueKey('gen_${row}_$col'),
+        tile: tileData,
+        bgColor: backgroundColor,
+        onTap: () => ref.read(grid.gridProvider.notifier).activateGenerator(row, col),
+      );
+    }
 
-        // Allow dropping item onto empty tile
-        if (targetTile.itemImagePath == null && sourceTile.isItem) {
-          return true; // Accept dropping item onto empty tile
-        }
-
-        // Existing merge logic
-        if (targetTile.itemImagePath != null &&
-            sourceTile.itemImagePath != null && // Ensure source has an item
-            targetTile.itemImagePath == sourceTile.itemImagePath) {
-          final nextItem = getNextItemInSequence(targetTile.itemImagePath!);
-          // Allow merging final items of specific types if needed (adjust condition)
-          if (nextItem != null ||
-              targetTile.itemImagePath == '🐚' ||
-              targetTile.itemImagePath == '⚔️') {
-            return true;
-          }
-        }
-
-        return false; // Default deny
-      },
-      onAccept: (dragData) {
-        final targetTile = gridData[row][col]; // Re-fetch target tile data
-        final sourceTile = dragData.tileData;
-
-        if (targetTile.itemImagePath == null && sourceTile.isItem) {
-          // Move item to empty tile
-          ref
-              .read(grid.gridProvider.notifier)
-              .moveItem(dragData.row, dragData.col, row, col);
-        } else if (targetTile.itemImagePath != null &&
-            targetTile.itemImagePath == sourceTile.itemImagePath) {
-          // Perform merge
-          ref
-              .read(grid.gridProvider.notifier)
-              .mergeTiles(row, col, dragData.row, dragData.col);
-        }
-      },
-      builder: (context, candidateData, rejectedData) {
-        Widget content = Container(
-          key: ValueKey(
-            'tile_${row}_${col}_${tileData.type}_${tileData.itemImagePath ?? 'base'}_${tileData.isReady}', // More specific key
-          ),
-          margin: const EdgeInsets.all(1.0),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            border: Border.all(
-              color: Colors.black.withOpacity(0.2),
-              width: 0.5,
-            ),
-            boxShadow:
-                tileData.isItem
-                    ? [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 3.0,
-                        offset: const Offset(1, 1),
-                      ),
-                    ]
-                    : null,
-            borderRadius: BorderRadius.circular(4.0),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            alignment: Alignment.center,
-            children: [
-              // Base Layer (Generator/Locked) - Use helper
-              if (tileData.isGenerator || tileData.isLocked)
-                buildTileContent(
-                  tileData.baseImagePath,
-                  fit: BoxFit.contain,
-                  size: 30,
-                ),
-              // Item Layer (Conditional) - Use helper
-              if (tileData.itemImagePath != null)
-                buildTileContent(
-                  tileData.itemImagePath!,
-                  fit: BoxFit.contain,
-                  size: 28,
-                ),
-              // Cooldown Overlay — uses a live-ticking widget
-              if (tileData.isGenerator && !tileData.isReady)
-                Positioned.fill(
-                  child: _CooldownOverlay(tile: tileData),
-                ),
-            ],
-          ),
-        );
-
-        content = SizedBox(width: 50, height: 50, child: content);
-
-        // Draggable Logic
-        bool isDraggable = tileData.isItem;
-        if (isDraggable) {
-          return Draggable<TileDropData>(
-            data: TileDropData(row: row, col: col, tileData: tileData),
-            feedback: Material(
-              color: Colors.transparent,
-              child: SizedBox(
-                width: 45,
-                height: 45,
-                // Use helper for feedback
-                child: buildTileContent(tileData.itemImagePath!, size: 40),
-              ),
-            ),
-            childWhenDragging: SizedBox(
-              width: 50,
-              height: 50,
-              child: Container(
-                key: ValueKey('dragging_${row}_$col'),
-                margin: const EdgeInsets.all(1.0),
-                decoration: BoxDecoration(
-                  color: backgroundColor,
-                  border: Border.all(
-                    color: Colors.black.withOpacity(0.2),
-                    width: 0.5,
-                  ),
-                  borderRadius: BorderRadius.circular(4.0),
-                ),
-                // Only show base if it exists (generator)
-                child:
-                    tileData.isGenerator
-                        ? buildTileContent(
-                          tileData.baseImagePath,
-                          fit: BoxFit.contain,
-                          size: 30,
-                        )
-                        : null, // Empty when dragging item from non-generator tile
-              ),
-            ),
-            child: content,
-          );
-        } else {
-          // GestureDetector for Taps
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedTile = (_selectedTile == tileData) ? null : tileData;
-              });
-
-              // Tap Logic for Non-Draggable Tiles
-              if (tileData.isLocked) {
-                _handleLockedTileTap(row, col); // Extracted tap logic
-              } else if (tileData.isGenerator) {
-                ref
-                    .read(grid.gridProvider.notifier)
-                    .activateGenerator(row, col);
-              }
-              // Handle tapping empty tiles if needed
-              else if (tileData.itemImagePath == null &&
-                  !tileData.isGenerator) {
-                // Optionally deselect or handle tap on empty tile
-                setState(() {
-                  _selectedTile = null; // Deselect on tapping empty tile
-                });
-              }
-            },
-            child: content,
-          );
-        }
-      },
+    Widget content = Container(
+      key: ValueKey('tile_${row}_${col}_${tileData.type}_${tileData.itemImagePath ?? 'base'}_${tileData.isReady}'),
+      margin: const EdgeInsets.all(1.0),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        border: Border.all(color: borderColor, width: borderWidth),
+        boxShadow: tileData.isItem
+            ? [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 3.0, offset: const Offset(1, 1))]
+            : null,
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        alignment: Alignment.center,
+        children: [
+          if (tileData.isLocked)
+            buildTileContent(tileData.baseImagePath, fit: BoxFit.contain, size: 30),
+          // Hide item while dragging or during implosion overlay
+          if (tileData.itemImagePath != null && !isDragSource && !isImploding)
+            buildTileContent(tileData.itemImagePath!, fit: BoxFit.contain, size: 28),
+          // Proximity pulse ring on valid hover target
+          if (hoverValid)
+            Positioned.fill(child: _PulseRing()),
+        ],
+      ),
     );
+
+    content = SizedBox(width: 50, height: 50, child: content);
+
+    // 7 ── New item pop: bounce-in at 120% → 100% ──────────────────────────
+    if (isPopTarget) {
+      content = TweenAnimationBuilder<double>(
+        key: ValueKey('pop_${row}_$col'),
+        tween: Tween(begin: 1.2, end: 1.0),
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.elasticOut,
+        builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+        child: content,
+      );
+    }
+
+    if (tileData.isItem) {
+      return GestureDetector(
+        onPanStart: (d) => _startItemDrag(row, col, d.globalPosition),
+        onPanUpdate: (d) => _updateItemDrag(d.globalPosition),
+        onPanEnd: (d) => _endItemDrag(d.globalPosition),
+        onPanCancel: () {
+          if (_isDragging) {
+            final src = _cellCenterGlobal(_dragRow!, _dragCol!);
+            setState(() { _isDragging = false; _hoverCell = null; _dragRow = null; _dragCol = null; });
+            _dragCtrl.wobbleAndReturn(src, () {});
+          }
+        },
+        child: content,
+      );
+    } else {
+      return GestureDetector(
+        onTap: () {
+          setState(() => _selectedTile = (_selectedTile == tileData) ? null : tileData);
+          if (tileData.isLocked) {
+            _handleLockedTileTap(row, col);
+          } else if (tileData.itemImagePath == null) {
+            setState(() => _selectedTile = null);
+          }
+        },
+        child: content,
+      );
+    }
   }
 
   // --- Helper for Locked Tile Tap Logic ---
@@ -377,18 +523,37 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Center(
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: grid.rowCount * grid.colCount, // Use constants
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: grid.colCount,
-                    childAspectRatio: 1.0,
-                    mainAxisSpacing: 1.0,
-                    crossAxisSpacing: 1.0,
+                child: Transform.translate(
+                  offset: _shakeOffset,
+                  child: Stack(
+                    children: [
+                      GridView.builder(
+                        key: _gridKey,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: grid.rowCount * grid.colCount,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: grid.colCount,
+                          childAspectRatio: 1.0,
+                          mainAxisSpacing: 1.0,
+                          crossAxisSpacing: 1.0,
+                        ),
+                        itemBuilder: (context, index) => _buildTile(index),
+                      ),
+                      // Merge effects overlay
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: MergeEffectsOverlay(controller: _mergeCtrl),
+                        ),
+                      ),
+                      // Drag overlay
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DragOverlay(controller: _dragCtrl),
+                        ),
+                      ),
+                    ],
                   ),
-                  // Use the _buildTile method defined within this State class
-                  itemBuilder: (context, index) => _buildTile(index),
                 ),
               ),
             ),
@@ -404,11 +569,12 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          if (kDebugMode) debugFab(context, ref),
+          if (kDebugMode) const SizedBox(width: 8),
           FloatingActionButton(
             heroTag: 'navFabGrid',
             onPressed: () {
-              ref.read(activeScreenIndexProvider.notifier).state =
-                  1; // Navigate to Map
+              ref.read(activeScreenIndexProvider.notifier).state = 1;
             },
             tooltip: 'Go to Map',
             backgroundColor: Colors.blueAccent,
@@ -420,15 +586,51 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
   }
 }
 
-// Define TileDropData class (can be moved to models/tile_data.dart if preferred)
-class TileDropData {
-  final int row;
-  final int col;
-  final TileData tileData;
+// ---------------------------------------------------------------------------
+// Pulse ring shown on valid drop target during proximity hover
+// ---------------------------------------------------------------------------
+class _PulseRing extends StatefulWidget {
+  const _PulseRing();
 
-  TileDropData({required this.row, required this.col, required this.tileData});
+  @override
+  State<_PulseRing> createState() => _PulseRingState();
 }
 
+class _PulseRingState extends State<_PulseRing> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 380))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Transform.scale(
+        scale: 1.0 + _ctrl.value * 0.10,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: Colors.greenAccent.withOpacity(0.6 + _ctrl.value * 0.3),
+              width: 2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Live-ticking cooldown overlay for generator tiles

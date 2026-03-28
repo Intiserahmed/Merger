@@ -727,6 +727,68 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     );
   }
 
+  // ── Debug helpers (never call from prod code) ──────────────────────────────
+
+  void debugFillGrid(List<String> items) {
+    final newGrid = state.map((r) => List<TileData>.from(r)).toList();
+    int itemIndex = 0;
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < colCount; c++) {
+        final tile = newGrid[r][c];
+        if (!tile.isGenerator && !tile.isLocked) {
+          newGrid[r][c] = TileData(
+            row: r, col: c,
+            type: TileType.item,
+            baseImagePath: tile.baseImagePath,
+            itemImagePath: items[itemIndex % items.length],
+          );
+          itemIndex++;
+        }
+      }
+    }
+    state = newGrid;
+  }
+
+  void debugClearItems() {
+    final newGrid = state.map((r) => List<TileData>.from(r)).toList();
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < colCount; c++) {
+        final tile = newGrid[r][c];
+        if (tile.isItem) {
+          newGrid[r][c] = TileData(
+            row: r, col: c,
+            type: TileType.empty,
+            baseImagePath: tile.baseImagePath,
+          );
+        }
+      }
+    }
+    state = newGrid;
+  }
+
+  void debugZeroCooldowns() {
+    final newGrid = state.map((r) => List<TileData>.from(r)).toList();
+    for (int r = 0; r < rowCount; r++) {
+      for (int c = 0; c < colCount; c++) {
+        final tile = newGrid[r][c];
+        if (tile.isGenerator) {
+          newGrid[r][c] = TileData(
+            row: r, col: c,
+            type: tile.type,
+            baseImagePath: tile.baseImagePath,
+            generatesItemPath: tile.generatesItemPath,
+            cooldownSeconds: tile.cooldownSeconds,
+            lastUsedTimestamp: DateTime.fromMillisecondsSinceEpoch(0),
+            energyCost: tile.energyCost,
+          );
+        }
+      }
+    }
+    state = newGrid;
+  }
+
+  void debugReset() => state = _initializeGridData();
+
   // Add more methods as needed: fulfillOrderRequirement, etc.
 }
 
