@@ -1,11 +1,9 @@
-// TODO Implement this library.
 // lib/widgets/game_grid/game_grid_orders.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:merger/providers/order_provider.dart';
+import 'package:merger/models/order.dart';
 import 'package:merger/widgets/game_grid/tile_content.dart';
-import 'package:merger/widgets/game_grid_components.dart'
-    hide buildTileContent; // Import helper
 
 class GameGridOrders extends ConsumerWidget {
   const GameGridOrders({super.key});
@@ -15,71 +13,78 @@ class GameGridOrders extends ConsumerWidget {
     final orders = ref.watch(orderProvider);
 
     if (orders.isEmpty) {
-      return const SizedBox(
-        height: 80,
-        child: Center(
-          child: Text(
-            "No active orders.",
-            style: TextStyle(color: Colors.white70),
-          ),
+      return Container(
+        height: 88,
+        color: Colors.black.withOpacity(0.2),
+        child: const Center(
+          child: Text('No active orders.', style: TextStyle(color: Colors.white54)),
         ),
       );
     }
 
-    // Display only the first order for simplicity
-    final order = orders.first;
-    final rewardText = '+${order.rewardCoins}';
-
     return Container(
-      height: 80,
+      height: 88,
       color: Colors.black.withOpacity(0.2),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center, // Center the content
-        children: [
-          // Placeholder for NPC CircleAvatar
-          const CircleAvatar(
-            backgroundColor: Colors.brown, // Placeholder color
-            radius: 30,
-            child: Text(
-              '🧑',
-              style: TextStyle(fontSize: 30),
-            ), // Placeholder icon
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: () {
-              ref.read(orderProvider.notifier).attemptDelivery(order);
-            },
-            style: ElevatedButton.styleFrom(
-              shape: const StadiumBorder(),
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        children: orders
+            .map((order) => Expanded(child: _OrderCard(order: order)))
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _OrderCard extends ConsumerWidget {
+  final Order order;
+  const _OrderCard({required this.order});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () => ref.read(orderProvider.notifier).attemptDelivery(order),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.brown.shade700,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.amber.shade600, width: 1.5),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Required item
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: buildTileContent(order.requiredItemId, size: 26),
             ),
-            child: const Text('GO', style: TextStyle(fontSize: 16)),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                rewardText,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.yellowAccent, // Highlight reward
-                  fontSize: 14,
+            // Count
+            Text(
+              'x${order.requiredCount}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            // Reward
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('🪙', style: TextStyle(fontSize: 10)),
+                Text(
+                  '${order.rewardCoins}',
+                  style: const TextStyle(
+                    color: Colors.amber,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              // Use the buildTileContent helper
-              SizedBox(
-                width: 35,
-                height: 35,
-                child: buildTileContent(order.requiredItemId, size: 30),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

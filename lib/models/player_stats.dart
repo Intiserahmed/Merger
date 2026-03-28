@@ -30,7 +30,7 @@ class PlayerStats {
     this.maxEnergy = 100, // Default max energy
     List<String>? initialUnlockedZoneIds, // Make it optional
     List<String>? initialInfrastructureLevelsData, // Optional for loading
-  }) : unlockedZoneIds = initialUnlockedZoneIds ?? [],
+  }) : unlockedZoneIds = initialUnlockedZoneIds ?? ['zone_starter'],
        // Initialize with level 1 infrastructure at upgrade 0 if not provided
        infrastructureLevelsData = initialInfrastructureLevelsData ?? ['1:0'];
 

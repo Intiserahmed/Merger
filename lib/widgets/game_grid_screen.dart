@@ -14,6 +14,7 @@ import 'package:merger/widgets/game_grid/game_grid_bottom_bar.dart'; // Import B
 import 'package:merger/widgets/game_grid_components.dart'
     hide buildTileContent; // Import helper
 
+import 'dart:async';
 import 'dart:math' as math;
 import '../models/tile_data.dart';
 import '../providers/grid_provider.dart' as grid;
@@ -38,7 +39,47 @@ class GameGridScreen extends ConsumerStatefulWidget {
 
 // Create the State class
 class _GameGridScreenState extends ConsumerState<GameGridScreen> {
-  TileData? _selectedTile; // State variable for the selected tile
+  TileData? _selectedTile;
+
+  void _showLevelUpBanner(BuildContext context, int newLevel) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1B2A3B), Color(0xFF2E5E3A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.amber, width: 2.5),
+            boxShadow: [BoxShadow(color: Colors.amber.withOpacity(0.4), blurRadius: 20, spreadRadius: 4)],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('⭐', style: TextStyle(fontSize: 52)),
+              const SizedBox(height: 8),
+              const Text('LEVEL UP!', style: TextStyle(color: Colors.amber, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 2)),
+              const SizedBox(height: 6),
+              Text('You reached Level $newLevel', style: const TextStyle(color: Colors.white70, fontSize: 16)),
+              const SizedBox(height: 4),
+              const Text('+10 Max Energy', style: TextStyle(color: Colors.greenAccent, fontSize: 14)),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Continue', style: TextStyle(color: Colors.amber, fontSize: 16)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   // --- Build Tile Method (Remains in State due to complexity and state access) ---
   Widget _buildTile(int index) {
@@ -154,25 +195,10 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
                   fit: BoxFit.contain,
                   size: 28,
                 ),
-              // Cooldown Overlay
+              // Cooldown Overlay — uses a live-ticking widget
               if (tileData.isGenerator && !tileData.isReady)
                 Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${tileData.remainingCooldown.inSeconds}s',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _CooldownOverlay(tile: tileData),
                 ),
             ],
           ),
@@ -326,7 +352,16 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen> {
   // --- Build Method (Simplified) ---
   @override
   Widget build(BuildContext context) {
-    // `ref` is available via the `ConsumerState`
+    // Level-up announcement listener
+    ref.listen<int>(
+      playerStatsProvider.select((s) => s.level),
+      (previous, next) {
+        if (previous != null && next > previous) {
+          _showLevelUpBanner(context, next);
+        }
+      },
+    );
+
     return Scaffold(
       backgroundColor: Colors.blueGrey.shade900,
       body: Column(
@@ -392,4 +427,53 @@ class TileDropData {
   final TileData tileData;
 
   TileDropData({required this.row, required this.col, required this.tileData});
+}
+
+
+// ---------------------------------------------------------------------------
+// Live-ticking cooldown overlay for generator tiles
+// ---------------------------------------------------------------------------
+class _CooldownOverlay extends StatefulWidget {
+  final TileData tile;
+  const _CooldownOverlay({required this.tile});
+
+  @override
+  State<_CooldownOverlay> createState() => _CooldownOverlayState();
+}
+
+class _CooldownOverlayState extends State<_CooldownOverlay> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = widget.tile.remainingCooldown;
+    if (remaining == Duration.zero) return const SizedBox.shrink();
+    final secs = remaining.inSeconds + 1;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.65),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Center(
+        child: Text(
+          '${secs}s',
+          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
 }

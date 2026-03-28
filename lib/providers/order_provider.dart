@@ -131,6 +131,20 @@ final Map<int, List<Order>> _ordersByLevel = {
   5: [
     // Orders available at Level 5
     Order(
+      id: 'lvl5_gem_1',
+      requiredItemId: '💎',
+      requiredCount: 2,
+      rewardCoins: 150,
+      rewardXp: 75,
+    ),
+    Order(
+      id: 'lvl5_gem_2',
+      requiredItemId: '🔮',
+      requiredCount: 1,
+      rewardCoins: 220,
+      rewardXp: 110,
+    ),
+    Order(
       id: 'lvl5_tool_5',
       requiredItemId: '🔗',
       requiredCount: 1,

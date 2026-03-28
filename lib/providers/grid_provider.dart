@@ -574,12 +574,11 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       print("Tile at ($row, $col) is not a generator.");
       return;
     }
-    // --- Temporarily removing cooldown check as requested ---
-    // if (!generatorTile.isReady) {
-    //   print("Generator at ($row, $col) is on cooldown.");
-    //   // Optional: Show feedback to user (e.g., SnackBar)
-    //   return;
-    // }
+    if (!generatorTile.isReady) {
+      final remaining = generatorTile.remainingCooldown;
+      print("Generator at ($row, $col) is on cooldown. ${remaining.inSeconds}s remaining.");
+      return;
+    }
     if (generatorTile.generatesItemPath == null) {
       print("Generator at ($row, $col) has nothing defined to generate.");
       return;
