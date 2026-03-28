@@ -3,36 +3,61 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/tile_unlock.dart'; // Or Zone
 import 'player_provider.dart'; // To watch player level
 
-// Assume you have a predefined list of all possible zones/unlocks
-// Define the areas covered by each zone
+// All unlockable zones. zone_starter is unlocked by default at game start.
 final List<TileUnlock> _allUnlockableTiles = [
+  TileUnlock(
+    id: 'zone_starter',
+    requiredLevel: 1,
+    unlockCostCoins: 0,
+    coveredTiles: [],
+  ),
   TileUnlock(
     id: 'zone_beach_1',
     requiredLevel: 2,
     unlockCostCoins: 100,
-    // Example: Covers a 2x2 area in the bottom right (using hardcoded 11x6 grid size)
     coveredTiles: [
-      Point(9, 4), // row 9, col 4
-      Point(9, 5), // row 9, col 5
-      Point(10, 4), // row 10, col 4
-      Point(10, 5), // row 10, col 5
+      Point(7, 5),
+      Point(7, 6),
+      Point(8, 5),
+      Point(8, 6),
     ],
   ),
   TileUnlock(
     id: 'zone_forest_1',
-    requiredLevel: 5,
-    unlockCostCoins: 500,
-    // Example: Covers a 3x2 area near the top right (using hardcoded 11x6 grid size)
+    requiredLevel: 3,
+    unlockCostCoins: 250,
     coveredTiles: [
-      Point(0, 4), // row 0, col 4
-      Point(0, 5), // row 0, col 5
-      Point(1, 4), // row 1, col 4
-      Point(1, 5), // row 1, col 5
-      Point(2, 4), // row 2, col 4
-      Point(2, 5), // row 2, col 5
+      Point(0, 4),
+      Point(0, 5),
+      Point(1, 4),
+      Point(1, 5),
+      Point(2, 4),
+      Point(2, 5),
     ],
   ),
-  // ... more zones with defined coveredTiles
+  TileUnlock(
+    id: 'zone_mine_1',
+    requiredLevel: 4,
+    unlockCostCoins: 400,
+    coveredTiles: [
+      Point(3, 5),
+      Point(4, 5),
+      Point(5, 5),
+    ],
+  ),
+  TileUnlock(
+    id: 'zone_castle_1',
+    requiredLevel: 5,
+    unlockCostCoins: 600,
+    coveredTiles: [
+      Point(0, 0),
+      Point(0, 1),
+      Point(1, 0),
+      Point(1, 1),
+      Point(2, 0),
+      Point(2, 1),
+    ],
+  ),
 ];
 
 // Note: rowCount and colCount are now defined in grid_provider.dart

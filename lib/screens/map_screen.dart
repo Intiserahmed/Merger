@@ -1,194 +1,114 @@
 // lib/screens/map_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:merger/providers/player_provider.dart'; // Import the main provider
-import 'package:merger/providers/navigation_provider.dart'; // Import navigation provider
+import '../models/zone_meta.dart';
+import '../providers/expansion_provider.dart';
+import '../providers/navigation_provider.dart';
+import '../providers/player_provider.dart';
+import '../widgets/game_grid/game_grid_hud.dart';
+import '../widgets/map/zone_node.dart';
 
 class MapScreen extends ConsumerWidget {
   const MapScreen({super.key});
 
-  // --- Build Top Area (Level + Status Bars) - Duplicated from GameGridScreen ---
-  // TODO: Refactor this into a shared widget
-  Widget _buildTopArea(BuildContext context, WidgetRef ref) {
-    // Watch the whole PlayerStats object
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final allZones = ref.watch(allUnlocksProvider);
+    final unlockedIds = ref.watch(unlockedStatusProvider);
     final playerStats = ref.watch(playerStatsProvider);
-    // Access individual stats from the object
-    final level = playerStats.level;
-    final energy = playerStats.energy;
-    final maxEnergy = playerStats.maxEnergy;
-    final coins = playerStats.coins;
-    final gems = playerStats.gems;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12.0,
-        vertical: 8.0,
-      ).copyWith(top: MediaQuery.of(context).padding.top + 8.0), // Safe area
-      color: Colors.blue.shade700, // Example background color
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1B2A),
+      body: Column(
         children: [
-          // --- Level Indicator ---
+          // Shared top HUD (same as game grid)
+          const GameGridHud(),
+
+          // Map title bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade900,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.lightBlueAccent, width: 1.5),
-            ),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            color: const Color(0xFF162032),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.star, color: Colors.yellowAccent, size: 20),
-                const SizedBox(width: 6),
+                const Text('🗺️', style: TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
                 Text(
-                  '$level',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                  'World Map',
+                  style: TextStyle(
+                    color: Colors.amber.shade300,
                     fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade700),
+                  ),
+                  child: Text(
+                    '${unlockedIds.length}/${allZones.length} zones',
+                    style: const TextStyle(color: Colors.amber, fontSize: 12),
                   ),
                 ),
               ],
             ),
           ),
-          // --- Resource Bars ---
-          Row(
-            children: [
-              _buildResourceBar('⚡', '$energy/$maxEnergy', Colors.yellow),
-              const SizedBox(width: 10),
-              _buildResourceBar('💰', '$coins', Colors.amber),
-              const SizedBox(width: 10),
-              _buildResourceBar('💎', '$gems', Colors.purpleAccent),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  // Helper for individual resource bars - Duplicated from GameGridScreen
-  // TODO: Refactor this into a shared widget
-  Widget _buildResourceBar(String icon, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withOpacity(0.8), width: 1),
-      ),
-      child: Row(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      // No AppBar needed as status is handled by _buildTopArea
-      backgroundColor: Colors.lightBlue.shade100, // Light background for map
-      body: Column(
-        children: [
-          // --- Top Status Bar ---
-          _buildTopArea(context, ref),
-
-          // --- Infrastructure Upgrade List ---
+          // Map canvas
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              // Build items up to the max defined player level
-              itemCount: maxPlayerLevel,
-              itemBuilder: (context, index) {
-                final infrastructureLevelKey = index + 1; // Level 1, 2, 3...
-                final playerStats = ref.watch(playerStatsProvider);
-                final currentUpgradeLevel =
-                    playerStats.infrastructureLevels[infrastructureLevelKey] ??
-                    0; // Default to 0 if not found
-                final bool isMaxed =
-                    currentUpgradeLevel >= maxInfrastructureUpgrade;
-                final nextUpgradeCost =
-                    isMaxed
-                        ? null
-                        : infrastructureUpgradeCost[currentUpgradeLevel + 1];
-                final bool canAfford =
-                    nextUpgradeCost != null &&
-                    playerStats.coins >= nextUpgradeCost;
-                final bool canUpgrade =
-                    !isMaxed &&
-                    nextUpgradeCost != null &&
-                    playerStats.level >=
-                        infrastructureLevelKey; // Can only upgrade current or past levels
-
-                // Placeholder icons for different levels
-                final icons = ['🏠', '🏭', '🏛️', '🏰', '🚀'];
-                final icon = icons[index % icons.length];
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8.0),
-                  elevation: 3,
-                  child: ListTile(
-                    leading: Text(icon, style: const TextStyle(fontSize: 30)),
-                    title: Text(
-                      'Level $infrastructureLevelKey Infrastructure',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return InteractiveViewer(
+                  boundaryMargin: const EdgeInsets.all(80),
+                  minScale: 0.6,
+                  maxScale: 2.0,
+                  child: SizedBox(
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                    child: Stack(
                       children: [
-                        Text(
-                          'Upgrade: $currentUpgradeLevel / $maxInfrastructureUpgrade',
+                        // Map background
+                        _MapBackground(
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
                         ),
-                        if (!isMaxed && nextUpgradeCost != null)
-                          Text(
-                            'Next Cost: $nextUpgradeCost 💰',
-                            style: TextStyle(
-                              color: canAfford ? Colors.green : Colors.red,
-                            ),
-                          )
-                        else if (isMaxed)
-                          const Text(
-                            'Max Level Reached',
-                            style: TextStyle(color: Colors.blue),
-                          )
-                        else // Should not happen if costs are defined correctly
-                          const Text(
-                            'Error: Cost not found',
-                            style: TextStyle(color: Colors.orange),
+
+                        // Dotted paths between zones
+                        CustomPaint(
+                          size: Size(constraints.maxWidth, constraints.maxHeight),
+                          painter: _PathPainter(
+                            allZones: allZones,
+                            unlockedIds: unlockedIds,
                           ),
+                        ),
+
+                        // Zone nodes
+                        ...allZones.map((zone) {
+                          final meta = metaForZone(zone.id);
+                          if (meta == null) return const SizedBox.shrink();
+                          final dx = meta.mapPosition.dx * constraints.maxWidth;
+                          final dy = meta.mapPosition.dy * constraints.maxHeight;
+                          return Positioned(
+                            left: dx - 40,
+                            top: dy - 48,
+                            child: ZoneNode(zone: zone, meta: meta),
+                          );
+                        }),
+
+                        // Player level badge
+                        Positioned(
+                          bottom: 12,
+                          left: 12,
+                          child: _LevelBadge(level: playerStats.level),
+                        ),
                       ],
                     ),
-                    trailing: ElevatedButton(
-                      onPressed:
-                          (canUpgrade && canAfford)
-                              ? () {
-                                ref
-                                    .read(playerStatsProvider.notifier)
-                                    .upgradeInfrastructure(
-                                      infrastructureLevelKey,
-                                    );
-                              }
-                              : null, // Disable button if cannot upgrade/afford
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            (canUpgrade && canAfford)
-                                ? Colors.green
-                                : Colors.grey,
-                      ),
-                      child: const Text('Upgrade'),
-                    ),
-                    enabled: canUpgrade, // Grey out tile if level not reached
                   ),
                 );
               },
@@ -196,16 +116,168 @@ class MapScreen extends ConsumerWidget {
           ),
         ],
       ),
-      // --- Navigation Button ---
       floatingActionButton: FloatingActionButton(
-        heroTag: 'navFabMap', // Unique heroTag for Map screen nav
+        heroTag: 'navFabMap',
         onPressed: () {
-          // Set the active screen index to 0 (GameGridScreen)
           ref.read(activeScreenIndexProvider.notifier).state = 0;
         },
         tooltip: 'Go to Grid',
-        backgroundColor: Colors.teal, // Match grid spawn button color?
-        child: const Icon(Icons.grid_on), // Icon indicating grid view
+        backgroundColor: Colors.teal,
+        child: const Icon(Icons.grid_on),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Map background — layered gradient terrain
+// ---------------------------------------------------------------------------
+class _MapBackground extends StatelessWidget {
+  final double width;
+  final double height;
+  const _MapBackground({required this.width, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    const decorEmojis = ['🌲', '🌳', '🌿', '🪨', '🌾', '🌊'];
+    const positions = [
+      Offset(0.1, 0.2),  Offset(0.85, 0.15), Offset(0.3, 0.1),
+      Offset(0.7, 0.35), Offset(0.15, 0.55), Offset(0.9, 0.5),
+      Offset(0.45, 0.05),Offset(0.55, 0.88), Offset(0.05, 0.8),
+      Offset(0.8, 0.8),  Offset(0.35, 0.65), Offset(0.65, 0.65),
+      Offset(0.2, 0.35), Offset(0.78, 0.55), Offset(0.12, 0.92),
+      Offset(0.9, 0.92), Offset(0.45, 0.78), Offset(0.6, 0.1),
+    ];
+
+    return Stack(
+      children: [
+        Container(
+          width: width,
+          height: height,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF1A3A2A),
+                Color(0xFF2E5E3A),
+                Color(0xFF4A7C50),
+                Color(0xFF5A8C5A),
+                Color(0xFF6B9E6B),
+              ],
+            ),
+          ),
+        ),
+        for (int i = 0; i < positions.length; i++)
+          Positioned(
+            left: positions[i].dx * width,
+            top: positions[i].dy * height,
+            child: Text(
+              decorEmojis[i % decorEmojis.length],
+              style: TextStyle(
+                fontSize: 20,
+                color: Colors.white.withOpacity(0.15),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dotted paths between consecutive zone nodes
+// ---------------------------------------------------------------------------
+class _PathPainter extends CustomPainter {
+  final List allZones;
+  final Set<String> unlockedIds;
+
+  const _PathPainter({required this.allZones, required this.unlockedIds});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final unlockedPaint = Paint()
+      ..color = Colors.amber.withOpacity(0.7)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final lockedPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.3)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final metas = allZones
+        .map((z) => metaForZone(z.id as String))
+        .whereType<ZoneMeta>()
+        .toList();
+
+    for (int i = 0; i < metas.length - 1; i++) {
+      final a = metas[i];
+      final b = metas[i + 1];
+      final p1 = Offset(a.mapPosition.dx * size.width, a.mapPosition.dy * size.height);
+      final p2 = Offset(b.mapPosition.dx * size.width, b.mapPosition.dy * size.height);
+      final bothUnlocked = unlockedIds.contains(a.id) && unlockedIds.contains(b.id);
+      _drawDotted(canvas, p1, p2, bothUnlocked ? unlockedPaint : lockedPaint);
+    }
+  }
+
+  void _drawDotted(Canvas canvas, Offset p1, Offset p2, Paint paint) {
+    const dashLen = 8.0;
+    const gapLen = 6.0;
+    final total = (p2 - p1).distance;
+    final dir = (p2 - p1) / total;
+    double drawn = 0;
+    bool isDash = true;
+    while (drawn < total) {
+      final seg = isDash ? dashLen : gapLen;
+      if (isDash) {
+        canvas.drawLine(
+          p1 + dir * drawn,
+          p1 + dir * (drawn + seg).clamp(0, total),
+          paint,
+        );
+      }
+      drawn += seg;
+      isDash = !isDash;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PathPainter old) => old.unlockedIds != unlockedIds;
+}
+
+// ---------------------------------------------------------------------------
+// Player level badge
+// ---------------------------------------------------------------------------
+class _LevelBadge extends StatelessWidget {
+  final int level;
+  const _LevelBadge({required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.amber, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('⭐', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 4),
+          Text(
+            'Level $level',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ],
       ),
     );
   }
