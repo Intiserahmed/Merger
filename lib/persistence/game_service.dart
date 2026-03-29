@@ -57,12 +57,13 @@ class GameService {
     if (savedTiles.isNotEmpty) {
       print("Loaded ${savedTiles.length} tiles.");
       // Reconstruct the grid (assuming rowCount/colCount are fixed)
+      // Each unfilled cell gets the correct row/col so _assertValidGrid passes
+      // even on partial saves (fewer tiles than rowCount*colCount).
       final loadedGrid = List.generate(
         rowCount,
-        (_) => List<TileData>.filled(
+        (r) => List.generate(
           colCount,
-          // Create a default empty tile temporarily
-          TileData(row: 0, col: 0, baseImagePath: defaultEmptyBase),
+          (c) => TileData(row: r, col: c, baseImagePath: defaultEmptyBase),
         ),
       );
       bool gridValid = true;

@@ -329,6 +329,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
       if (newGrid[row][col].type == TileType.generator) continue;
       // Skip if still locked
       if (newGrid[row][col].type == TileType.locked) continue;
+      // Skip if player has an item there — never silently overwrite their work
+      if (newGrid[row][col].type == TileType.item) continue;
       final config = generatorConfigs[emoji];
       if (config == null) continue;
       newGrid[row][col] = TileData(
