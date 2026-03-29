@@ -75,27 +75,23 @@ Energy is never spent if no spawn tile exists. Items are never consumed unless t
 
 ## Engineering Practices
 
-### Invariant Checking
+### Atomic Mutations — No Partial State
 
-`_assertValidGrid()` and `_assertValidState()` run on every state write in debug builds using Dart `assert()`. They verify grid dimensions, per-tile row/col metadata, generator configuration, and order slot limits — catching programmer errors at the earliest possible point, with zero overhead in release builds.
+Every game action that can fail follows a strict two-phase contract: **validate first, commit second**. Energy availability, item counts, and free spawn tiles are all confirmed before a single value changes. If anything is missing, the operation aborts cleanly — energy is never deducted on a full grid, items are never consumed for an order that can't be filled, and a zone unlock writes both the coin deduction and the unlock ID in a single `copyWith()`. Partial state is structurally impossible.
 
-### Load Validation
+Persistence follows the same rule — all three Isar collections are written inside one `writeTxn`. A failure at any point rolls back the entire transaction.
 
-Every field of a loaded `PlayerStats` is checked before it touches provider state. Out-of-range levels, negative coins, and impossible energy values are all caught with a warning log and a safe default fallback — the game never silently starts in a corrupt state.
+### Defensive Load, Safe Defaults
 
-### Robustness Hardening
+The game never trusts what's on disk. Every field of a persisted `PlayerStats` is range-checked before it touches provider state — negative coins, impossible energy, out-of-range levels, corrupt generator records. Each violation logs a warning and falls back to a safe default rather than propagating bad state into the session. Players never see a crash from a corrupt save; they get a clean start.
 
-The codebase went through **nine systematic audit passes**, each targeting new areas:
+### Debug Assertions, Zero Production Overhead
 
-- Atomic energy-spend + spawn (no energy lost when grid is full)
-- Generator placement retry after zone unlock (generators in locked zones now placed on zone open)
-- Corrupt save recovery — partial grids, null `generatesItemPath`, wrong Isar record ID
-- Dead code removal — 5 unused `StateProvider`s, stale special-case merge rules
-- `Isar.autoIncrement` → `get(1)` fix (saves were silently never loading)
-- Level-specific order pools — no old-level orders bleeding through on level-up
-- Drop-onto-generator blocked in drag validation (prevented silent generator overwrite)
-- Navigation index clamped against out-of-bounds crash
-- `availableUnlocksProvider` fixed to watch live player level (was frozen at level 1)
+`_assertValidGrid()` and `_assertValidState()` run on every state mutation in debug builds, catching grid dimension mismatches, broken tile coordinates, and invalid generator config at the earliest possible moment. Dart `assert()` is a compile-time no-op in release — no cost, no risk, no feature flags needed. The debug panel follows the same principle: scoped to `kDebugMode`, stripped entirely in production builds.
+
+### Unidirectional State — No Widget Owns Data
+
+No widget reads or writes game state directly. Every interaction goes through a `StateNotifier` provider, and derived reads use `.select()` to rebuild only on the specific fields a widget depends on. The boundary is strict: widgets render, providers mutate. This makes the entire game loop independently testable without a widget tree and prevents the class of bugs where UI and data fall out of sync.
 
 ---
 
