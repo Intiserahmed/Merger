@@ -271,6 +271,12 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
             _unlockTilesForZone(zone);
           }
         }
+        // Re-check pending generators — some may have been skipped because
+        // their tile was locked at the time the player reached the target level.
+        final currentLevel = ref.read(playerStatsProvider).level;
+        for (int lvl = 1; lvl <= currentLevel; lvl++) {
+          _tryPlaceGeneratorsForLevel(lvl);
+        }
       }
     });
   }
@@ -308,35 +314,43 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
     }
   }
 
+  // Place any generators scheduled for [level] whose tiles are now unlocked.
+  // Called both on level-up and after a zone unlock, so generators whose zone
+  // was locked at level-up time still get placed once the zone opens.
+  void _tryPlaceGeneratorsForLevel(int level) {
+    final toPlace = _generatorUnlocksByLevel[level];
+    if (toPlace == null) return;
+    final currentGrid = state;
+    final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
+    bool changed = false;
+    for (final (row, col, emoji) in toPlace) {
+      if (row < 0 || row >= rowCount || col < 0 || col >= colCount) continue;
+      // Skip if already a generator (placed on a prior attempt)
+      if (newGrid[row][col].type == TileType.generator) continue;
+      // Skip if still locked
+      if (newGrid[row][col].type == TileType.locked) continue;
+      final config = generatorConfigs[emoji];
+      if (config == null) continue;
+      newGrid[row][col] = TileData(
+        row: row,
+        col: col,
+        type: TileType.generator,
+        baseImagePath: emoji,
+        generatesItemPath: mergeTrees[config.sequenceId]?.first,
+        cooldownSeconds: config.cooldown,
+        energyCost: config.energyCost,
+      );
+      changed = true;
+      print('Generator $emoji placed at ($row, $col).');
+    }
+    if (changed) state = newGrid;
+  }
+
   // Auto-place generators when the player reaches the required level.
   void _watchLevelForGenerators() {
     ref.listen<int>(
       playerStatsProvider.select((s) => s.level),
-      (previous, newLevel) {
-        final toPlace = _generatorUnlocksByLevel[newLevel];
-        if (toPlace == null) return;
-        final currentGrid = state;
-        final newGrid = currentGrid.map((r) => List<TileData>.from(r)).toList();
-        bool changed = false;
-        for (final (row, col, emoji) in toPlace) {
-          if (row < 0 || row >= rowCount || col < 0 || col >= colCount) continue;
-          if (newGrid[row][col].type == TileType.locked) continue; // zone not unlocked yet
-          final config = generatorConfigs[emoji];
-          if (config == null) continue;
-          newGrid[row][col] = TileData(
-            row: row,
-            col: col,
-            type: TileType.generator,
-            baseImagePath: emoji,
-            generatesItemPath: mergeTrees[config.sequenceId]?.first,
-            cooldownSeconds: config.cooldown,
-            energyCost: config.energyCost,
-          );
-          changed = true;
-          print('Generator $emoji placed at ($row, $col) on reaching level $newLevel.');
-        }
-        if (changed) state = newGrid;
-      },
+      (previous, newLevel) => _tryPlaceGeneratorsForLevel(newLevel),
     );
   }
 
@@ -397,80 +411,8 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
         newGrid[targetRow][targetCol] = newTargetData;
         newGrid[sourceRow][sourceCol] = newSourceData;
         state = newGrid;
-
-        // --- Add XP for Merge ---
-        // Find the original sequence and index to calculate XP
-        int xpGained = 0;
-        int originalIndex = -1;
-        for (final sequence in mergeTrees.values) {
-          originalIndex = sequence.indexOf(targetTile.itemImagePath!);
-          if (originalIndex != -1) {
-            // Found the sequence, calculate XP based on the *original* item's level (index + 1)
-            // Using a simple formula for now, can be customized per sequence later
-            xpGained = (originalIndex + 1) * 5; // Example: 5, 10, 15 XP...
-            break;
-          }
-        }
-
-        if (xpGained > 0) {
-          ref.read(playerStatsProvider.notifier).addXp(xpGained);
-          print("Gained $xpGained XP for merging into $nextItemPath");
-        } else {
-          print(
-            "Merged $nextItemPath, but couldn't determine XP gain (sequence not found?).",
-          );
-        }
-
+        print("Merged $nextItemPath at ($targetRow, $targetCol).");
         return; // Merge handled, exit function
-      }
-      // --- Handle Specific Non-Sequence Merges (e.g., Shell, Sword) ---
-      // These items might not be in mergeTrees or might have unique merge results
-      else {
-        String? specificMergedItemPath;
-        int xpGained = 0;
-
-        // Rule: Shell + Shell -> Star (Assuming '⭐' is not the next item in a sequence for '🐚')
-        if (targetTile.itemImagePath == '🐚') {
-          specificMergedItemPath = '⭐';
-          xpGained = 15;
-        }
-        // Rule: Sword + Sword -> Shield (Assuming '🛡️' is not the next item for '⚔️')
-        else if (targetTile.itemImagePath == '⚔️') {
-          specificMergedItemPath = '🛡️';
-          xpGained = 25;
-        }
-        // Add other specific merge rules here
-
-        if (specificMergedItemPath != null) {
-          final newTargetData = TileData(
-            row: targetRow,
-            col: targetCol,
-            type: TileType.item,
-            baseImagePath: targetTile.baseImagePath,
-            itemImagePath: specificMergedItemPath,
-            overlayNumber: 0,
-          );
-          final newSourceData = TileData(
-            row: sourceRow,
-            col: sourceCol,
-            type: TileType.empty,
-            baseImagePath: defaultEmptyBase,
-          );
-
-          final newGrid =
-              currentGrid.map((row) => List<TileData>.from(row)).toList();
-          newGrid[targetRow][targetCol] = newTargetData;
-          newGrid[sourceRow][sourceCol] = newSourceData;
-          state = newGrid;
-
-          if (xpGained > 0) {
-            ref.read(playerStatsProvider.notifier).addXp(xpGained);
-            print(
-              "Gained $xpGained XP for merging into $specificMergedItemPath",
-            );
-          }
-          return; // Specific merge handled
-        }
       }
     }
 
@@ -675,9 +617,10 @@ class GridNotifier extends StateNotifier<List<List<TileData>>> {
 
     // 3. Spend energy only after confirming a spawn tile exists.
     final playerNotifier = ref.read(playerStatsProvider.notifier);
-    if (!playerNotifier.spendEnergy(1)) {
+    final energyCost = generatorTile.energyCost.clamp(1, 999);
+    if (!playerNotifier.spendEnergy(energyCost)) {
       print(
-        "Not enough energy (cost 1) to activate generator at ($row, $col).",
+        "Not enough energy (cost $energyCost) to activate generator at ($row, $col).",
       );
       return;
     }

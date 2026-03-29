@@ -31,10 +31,8 @@ class GameService {
   Future<void> loadGame() async {
     print("Attempting to load game state...");
 
-    // Load Player Stats
-    final savedStats = await isar.playerStats.get(
-      Isar.autoIncrement,
-    ); // Assuming only one entry
+    // Load Player Stats — always saved with id=1 (see saveGame)
+    final savedStats = await isar.playerStats.get(1);
     if (savedStats != null) {
       final problem = _validateStats(savedStats);
       if (problem != null) {
@@ -70,6 +68,15 @@ class GameService {
       bool gridValid = true;
       for (final tile in savedTiles) {
         if (tile.row < rowCount && tile.col < colCount) {
+          // Drop corrupt generator tiles that have no item to produce — they
+          // would crash at activateGenerator() with a null dereference.
+          if (tile.isGenerator && tile.generatesItemPath == null) {
+            print(
+              "Warning: Generator at (${tile.row}, ${tile.col}) has no generatesItemPath. Resetting to empty.",
+            );
+            gridValid = false;
+            continue;
+          }
           loadedGrid[tile.row][tile.col] = tile;
         } else {
           print(
@@ -96,9 +103,10 @@ class GameService {
     // Load Orders (Optional - might regenerate on load instead)
     final savedOrders = await isar.orders.where().findAll();
     if (savedOrders.isNotEmpty) {
-      print("Loaded ${savedOrders.length} orders.");
-      // Update the OrderProvider state
-      container.read(orderProvider.notifier).state = savedOrders;
+      // Cap at 3 to guard against corrupted saves with extra orders.
+      final capped = savedOrders.take(3).toList();
+      print("Loaded ${capped.length} orders (${savedOrders.length} in DB).");
+      container.read(orderProvider.notifier).state = capped;
     } else {
       print("No saved Orders found, generating initial orders.");
       // OrderProvider initializes itself, so nothing needed here

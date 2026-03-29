@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_fireworks/flutter_fireworks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:merger/providers/order_provider.dart';
+import 'package:merger/providers/grid_provider.dart';
 import 'package:merger/models/order.dart';
+import 'package:merger/models/tile_data.dart';
 import 'package:merger/widgets/game_grid/tile_content.dart';
 
 class GameGridOrders extends ConsumerWidget {
@@ -45,6 +47,19 @@ class _OrderCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Count matching items on the grid (exclude generators).
+    final grid = ref.watch(gridProvider);
+    int have = 0;
+    for (final row in grid) {
+      for (final tile in row) {
+        if (!tile.isGenerator && tile.itemImagePath == order.requiredItemId) {
+          have++;
+        }
+      }
+    }
+    final int need = order.requiredCount;
+    final bool ready = have >= need;
+
     return GestureDetector(
       onTap: () {
         final success =
@@ -59,12 +74,19 @@ class _OrderCard extends ConsumerWidget {
           );
         }
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: Colors.brown.shade700,
+          color: ready ? Colors.green.shade800 : Colors.brown.shade700,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.amber.shade600, width: 1.5),
+          border: Border.all(
+            color: ready ? Colors.greenAccent.shade400 : Colors.amber.shade600,
+            width: ready ? 2.0 : 1.5,
+          ),
+          boxShadow: ready
+              ? [BoxShadow(color: Colors.greenAccent.withValues(alpha: 0.35), blurRadius: 8)]
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -74,10 +96,11 @@ class _OrderCard extends ConsumerWidget {
               height: 32,
               child: buildTileContent(order.requiredItemId, size: 26),
             ),
+            // Progress: "have / need" — turns green when ready
             Text(
-              'x${order.requiredCount}',
-              style: const TextStyle(
-                color: Colors.white,
+              '$have / $need',
+              style: TextStyle(
+                color: ready ? Colors.greenAccent.shade200 : Colors.white70,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),

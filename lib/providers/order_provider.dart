@@ -69,11 +69,12 @@ final Map<int, List<Order>> _ordersByLevel = {
     Order(id: 'lvl9_food_1',    requiredItemId: '🥐', requiredCount: 2,  rewardCoins: 350, rewardXp: 175),
     Order(id: 'lvl9_plant_1',   requiredItemId: '🌴', requiredCount: 2,  rewardCoins: 500, rewardXp: 250),
     Order(id: 'lvl9_tool_1',    requiredItemId: '⚒️', requiredCount: 1,  rewardCoins: 550, rewardXp: 275),
+    Order(id: 'lvl9_gem_2',     requiredItemId: '👑', requiredCount: 1,  rewardCoins: 700, rewardXp: 350),
   ],
   10: [
     Order(id: 'lvl10_magic_1',  requiredItemId: '🌈', requiredCount: 1,  rewardCoins: 800, rewardXp: 400),
     Order(id: 'lvl10_food_1',   requiredItemId: '🎁', requiredCount: 1,  rewardCoins: 700, rewardXp: 350),
-    Order(id: 'lvl10_gem_1',    requiredItemId: '👑', requiredCount: 1,  rewardCoins: 900, rewardXp: 450),
+    Order(id: 'lvl10_gem_1',    requiredItemId: '🏆', requiredCount: 1,  rewardCoins: 1000, rewardXp: 500),
     Order(id: 'lvl10_plant_1',  requiredItemId: '🎋', requiredCount: 1,  rewardCoins: 450, rewardXp: 225),
     Order(id: 'lvl10_pebble_1', requiredItemId: '🌸', requiredCount: 1,  rewardCoins: 350, rewardXp: 175),
     Order(id: 'lvl10_tool_1',   requiredItemId: '⚒️', requiredCount: 1,  rewardCoins: 550, rewardXp: 275),
@@ -134,25 +135,14 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     _assertValidState();
   }
 
-  // Fix 4: Cumulative pool — level 3 includes level 1+2+3 orders.
-  // Fix 1: No dedup against completed orders — same order can reappear after delivery.
-  //        Only excludes orders currently active (no duplicate simultaneous slots).
+  // Returns only orders defined for the current level.
+  // Players see exactly the orders designed for their level — no old orders bleed through.
   List<Order> _getAvailableOrdersForLevel(int playerLevel) {
     assert(playerLevel >= 1, 'Invalid playerLevel: $playerLevel');
-    // Clamp to the highest defined level so adding player levels without
-    // updating _ordersByLevel degrades gracefully instead of crashing.
     final maxDefinedLevel = _ordersByLevel.keys.reduce((a, b) => a > b ? a : b);
     final effectiveLevel = playerLevel.clamp(1, maxDefinedLevel);
-    assert(
-      effectiveLevel == playerLevel,
-      'No orders defined for level $playerLevel — add entries to _ordersByLevel. '
-      'Falling back to level $maxDefinedLevel pool.',
-    );
-    final pool = <Order>[];
-    for (int lvl = 1; lvl <= effectiveLevel; lvl++) {
-      pool.addAll(_ordersByLevel[lvl] ?? []);
-    }
-    assert(pool.isNotEmpty, 'Cumulative order pool is empty for level $effectiveLevel');
+    final pool = List<Order>.from(_ordersByLevel[effectiveLevel] ?? []);
+    assert(pool.isNotEmpty, 'Order pool is empty for level $effectiveLevel');
     return pool;
   }
 
@@ -170,7 +160,8 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     final itemLocations = <Point<int>>[];
     for (int r = 0; r < gridState.length; r++) {
       for (int c = 0; c < gridState[r].length; c++) {
-        if (gridState[r][c].itemImagePath == orderToDeliver.requiredItemId) {
+        if (!gridState[r][c].isGenerator &&
+            gridState[r][c].itemImagePath == orderToDeliver.requiredItemId) {
           itemLocations.add(Point(r, c));
         }
       }
@@ -200,6 +191,9 @@ class OrderNotifier extends StateNotifier<List<Order>> {
 
     // 2b. Grant rewards
     playerNotifier.addCoins(orderToDeliver.rewardCoins);
+    if (orderToDeliver.rewardXp > 0) {
+      playerNotifier.addXp(orderToDeliver.rewardXp);
+    }
     print("Order '${orderToDeliver.id}' delivered! Rewarded ${orderToDeliver.rewardCoins} coins.");
 
     // 2c. Remove completed order
@@ -255,12 +249,17 @@ class OrderNotifier extends StateNotifier<List<Order>> {
     }
   }
 
-  // On level-up: keeps existing orders and fills empty slots with
-  // orders from the now-expanded cumulative pool.
+  // On level-up: removes orders from the previous level, then fills all
+  // slots with fresh orders for the new level.
   void _fillOrderSlots() {
     const int maxActiveOrders = 3;
     final playerLevel = ref.read(playerStatsProvider).level;
     print("[OrderNotifier] _fillOrderSlots: Filling slots for level $playerLevel");
+
+    // Remove any active orders that don't belong to the current level's pool.
+    final currentPool = _getAvailableOrdersForLevel(playerLevel);
+    final currentPoolIds = currentPool.map((o) => o.id).toSet();
+    state = state.where((o) => currentPoolIds.contains(o.id)).toList();
 
     while (state.length < maxActiveOrders) {
       final pool = _getAvailableOrdersForLevel(playerLevel);

@@ -72,6 +72,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         final splashDone = ref.watch(splashDoneProvider);
         final activeIndex = ref.watch(activeScreenIndexProvider);
         const screens = [GameGridScreen(), MapScreen()];
+        final safeIndex = activeIndex.clamp(0, screens.length - 1);
 
         return MaterialApp(
           title: 'Merger',
@@ -80,7 +81,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.amber),
             useMaterial3: true,
           ),
-          home: splashDone ? screens[activeIndex] : const SplashScreen(),
+          home: splashDone ? screens[safeIndex] : const SplashScreen(),
         );
       },
     );

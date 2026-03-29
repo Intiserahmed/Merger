@@ -49,7 +49,11 @@ class PlayerStats {
         final upgradeLevel = int.tryParse(parts[1]);
         if (levelKey != null && upgradeLevel != null) {
           map[levelKey] = upgradeLevel;
+        } else {
+          print('Warning: malformed infrastructureLevelsData entry: "$entry" — skipped.');
         }
+      } else {
+        print('Warning: malformed infrastructureLevelsData entry: "$entry" — skipped.');
       }
     }
     return map;

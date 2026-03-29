@@ -158,10 +158,7 @@ final unlockedStatusProvider = Provider<Set<String>>((ref) {
 
 // Derived provider: Which zones CAN the player currently see/interact with?
 final availableUnlocksProvider = Provider<List<TileUnlock>>((ref) {
-  final playerLevel = ref.watch(
-    playerLevelProvider,
-  ); // Watch simple level provider
-  // OR: final playerLevel = ref.watch(playerStatsProvider).level; // Watch notifier
+  final playerLevel = ref.watch(playerStatsProvider.select((s) => s.level));
   final allUnlocks = ref.watch(allUnlocksProvider);
   final unlockedIds = ref.watch(unlockedStatusProvider);
 

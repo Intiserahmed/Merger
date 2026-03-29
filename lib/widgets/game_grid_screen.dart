@@ -216,16 +216,13 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen>
     final source = gridData[srcRow][srcCol];
 
     if (target.isLocked) return false;
+    if (target.isGenerator) return false;
     if (target.itemImagePath == null && source.isItem) return true;
     if (target.itemImagePath != null &&
         source.itemImagePath != null &&
         target.itemImagePath == source.itemImagePath) {
       final next = getNextItemInSequence(target.itemImagePath!);
-      if (next != null ||
-          target.itemImagePath == '🐚' ||
-          target.itemImagePath == '⚔️') {
-        return true;
-      }
+      if (next != null) return true;
     }
     return false;
   }
@@ -264,6 +261,10 @@ class _GameGridScreenState extends ConsumerState<GameGridScreen>
 
   @override
   void dispose() {
+    _isDragging = false;
+    _dragRow = null;
+    _dragCol = null;
+    _hoverCell = null;
     _shakeCtrl.dispose();
     super.dispose();
   }

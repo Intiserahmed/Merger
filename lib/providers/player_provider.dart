@@ -6,12 +6,6 @@ import '../models/player_stats.dart';
 import '../models/tile_unlock.dart';
 import 'expansion_provider.dart';
 
-final energyProvider = StateProvider<int>((ref) => 100);
-final coinsProvider = StateProvider<int>((ref) => 50);
-final gemsProvider = StateProvider<int>((ref) => 20);
-final xpProvider = StateProvider<int>((ref) => 0);
-final playerLevelProvider = StateProvider<int>((ref) => 1);
-
 // --- Infrastructure upgrade system ---
 const int maxInfrastructureUpgrade = 5;
 const Map<int, int> infrastructureUpgradeCost = {
@@ -247,8 +241,8 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
     state = PlayerStats(
       level: 1,
       xp: 0,
-      energy: 20,
-      maxEnergy: 20,
+      energy: 100,
+      maxEnergy: 100,
       coins: 0,
       gems: 0,
     );
@@ -257,6 +251,10 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
   // ── Zone unlocking ─────────────────────────────────────────────────────────
 
   bool unlockZone(TileUnlock zone) {
+    if (state.unlockedZoneIds.contains(zone.id)) {
+      print("Zone '${zone.id}' already unlocked.");
+      return true;
+    }
     if (state.level < zone.requiredLevel) {
       print("Cannot unlock '${zone.id}'. Requires level ${zone.requiredLevel}.");
       return false;
@@ -265,9 +263,11 @@ class PlayerStatsNotifier extends StateNotifier<PlayerStats> {
       print("Cannot unlock '${zone.id}'. Need ${zone.unlockCostCoins} coins.");
       return false;
     }
-    spendCoins(zone.unlockCostCoins);
-    final newIds = List<String>.from(state.unlockedZoneIds)..add(zone.id);
-    state = state.copyWith(unlockedZoneIds: newIds);
+    // Atomic: spend coins and add zone ID in a single state update.
+    state = state.copyWith(
+      coins: state.coins - zone.unlockCostCoins,
+      unlockedZoneIds: [...state.unlockedZoneIds, zone.id],
+    );
     print("Zone '${zone.id}' unlocked for ${zone.unlockCostCoins} coins!");
     return true;
   }
